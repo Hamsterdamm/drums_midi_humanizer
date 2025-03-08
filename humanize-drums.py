@@ -12,7 +12,8 @@ def humanize_drums(input_file, output_file,
                    accent_prob=0.2,
                    shuffle_amount=0.0,
                    flamming_prob=0.05,
-                   drummer_style="balanced"):
+                   drummer_style="balanced",
+                   drum_library="gm"):
     """
     Add realistic human feel to a MIDI drum track based on drumming principles.
     
@@ -36,6 +37,8 @@ def humanize_drums(input_file, output_file,
         Probability of adding flams to snare hits (0.0 to 1.0)
     drummer_style : str
         Style profile to apply ("balanced", "jazzy", "rock", "precise", "loose")
+    drum_library : str
+        Drum library to use for MIDI mapping ("gm", "ad2", "sd3", "ez2", "ssd5")
     """
     print(f"Loading MIDI file: {input_file}")
     midi_file = mido.MidiFile(input_file)
@@ -95,7 +98,11 @@ def humanize_drums(input_file, output_file,
     # Get selected profile, default to balanced if not found
     profile = drummer_profiles.get(drummer_style.lower(), drummer_profiles["balanced"])
     
-    # Common GM drum mapping
+    # ----------------------------------
+    # Drum Library MIDI Mappings
+    # ----------------------------------
+    
+    # General MIDI Drum Mapping (GM)
     GM_DRUM_MAP = {
         # Kicks
         35: "Acoustic Bass Drum",
@@ -124,12 +131,158 @@ def humanize_drums(input_file, output_file,
         59: "Ride Cymbal 2",
     }
     
-    # Group drum types for specialized handling
-    KICK_NOTES = [35, 36]
-    SNARE_NOTES = [38, 40]
-    HIHAT_NOTES = [42, 44, 46]
-    TOM_NOTES = [41, 43, 45, 47, 48, 50]
-    CYMBAL_NOTES = [49, 51, 52, 53, 55, 57, 59]
+    # Addictive Drums 2 Mapping
+    AD2_DRUM_MAP = {
+        # Kicks
+        36: "Kick",
+        # Snares
+        38: "Snare Center",
+        40: "Snare Rimshot",
+        37: "Snare Sidestick",
+        # Hi-hats
+        42: "HH Closed Tip",
+        22: "HH Closed Shank",
+        44: "HH Pedal",
+        46: "HH Open",
+        26: "HH Half Open",
+        # Toms
+        41: "Tom 1",
+        43: "Tom 2",
+        45: "Tom 3",
+        48: "Tom 4",
+        # Cymbals
+        49: "Crash 1",
+        57: "Crash 2",
+        52: "China",
+        55: "Splash",
+        51: "Ride Tip",
+        59: "Ride Crash",
+        53: "Ride Bell",
+    }
+    
+    # Superior Drummer 3 Mapping
+    SD3_DRUM_MAP = {
+        # Kicks
+        36: "Kick Right",
+        35: "Kick Left",
+        # Snares
+        38: "Snare Center",
+        40: "Snare Rimshot",
+        37: "Snare Sidestick",
+        39: "Snare Rimclick",
+        # Hi-hats
+        42: "HH Closed Tip",
+        22: "HH Closed Shank",
+        44: "HH Pedal",
+        46: "HH Open Tip",
+        26: "HH Half Open Tip",
+        # Toms
+        48: "Tom 1",
+        45: "Tom 2",
+        43: "Tom 3",
+        41: "Tom 4",
+        # Cymbals
+        49: "Crash 1 Tip",
+        57: "Crash 2 Tip",
+        55: "Splash Tip",
+        52: "China Tip",
+        51: "Ride Tip",
+        53: "Ride Bell",
+        59: "Ride Edge",
+    }
+    
+    # EZdrummer 2 Mapping
+    EZ2_DRUM_MAP = {
+        # Kicks
+        36: "Kick",
+        # Snares
+        38: "Snare Center",
+        40: "Snare Rimshot",
+        37: "Snare Sidestick",
+        # Hi-hats
+        42: "HH Closed Tip",
+        22: "HH Closed Shank",
+        44: "HH Pedal",
+        46: "HH Open",
+        26: "HH Half Open",
+        # Toms
+        48: "Tom 1",
+        45: "Tom 2",
+        43: "Tom 3",
+        41: "Tom 4", 
+        # Cymbals
+        49: "Crash 1",
+        57: "Crash 2",
+        55: "Splash",
+        52: "China",
+        51: "Ride Tip",
+        53: "Ride Bell",
+        59: "Ride Edge",
+    }
+    
+    # Steven Slate Drums 5 Mapping
+    SSD5_DRUM_MAP = {
+        # Kicks
+        36: "Kick",
+        # Snares
+        38: "Snare Center",
+        40: "Snare Rimshot",
+        37: "Snare Sidestick",
+        # Hi-hats
+        42: "HH Closed",
+        44: "HH Pedal",
+        46: "HH Open",
+        # Toms
+        41: "Tom 4 (Floor)",
+        43: "Tom 3 (Floor)",
+        45: "Tom 2 (Mid)",
+        48: "Tom 1 (High)",
+        # Cymbals
+        49: "Crash 1",
+        57: "Crash 2",
+        55: "Splash",
+        52: "China",
+        51: "Ride Bow",
+        53: "Ride Bell",
+        59: "Ride Edge",
+    }
+    
+    # Select the appropriate drum map based on the library
+    drum_maps = {
+        "gm": GM_DRUM_MAP,
+        "ad2": AD2_DRUM_MAP,
+        "sd3": SD3_DRUM_MAP,
+        "ez2": EZ2_DRUM_MAP,
+        "ssd5": SSD5_DRUM_MAP
+    }
+    
+    selected_map = drum_maps.get(drum_library.lower(), GM_DRUM_MAP)
+    print(f"Using drum library mapping: {drum_library.upper() if drum_library.lower() in drum_maps else 'General MIDI'}")
+    
+    # Group drum types for specialized handling based on selected mapping
+    def get_note_groups(drum_map):
+        kick_notes = []
+        snare_notes = []
+        hihat_notes = []
+        tom_notes = []
+        cymbal_notes = []
+        
+        for note, name in drum_map.items():
+            name_lower = name.lower()
+            if "kick" in name_lower or "bass drum" in name_lower:
+                kick_notes.append(note)
+            elif "snare" in name_lower:
+                snare_notes.append(note)
+            elif "hh" in name_lower or "hi-hat" in name_lower or "hihat" in name_lower:
+                hihat_notes.append(note)
+            elif "tom" in name_lower:
+                tom_notes.append(note)
+            elif any(x in name_lower for x in ["crash", "ride", "china", "splash"]):
+                cymbal_notes.append(note)
+        
+        return kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes
+    
+    KICK_NOTES, SNARE_NOTES, HIHAT_NOTES, TOM_NOTES, CYMBAL_NOTES = get_note_groups(selected_map)
     
     # Process each track
     for track_idx, track in enumerate(midi_file.tracks):
@@ -152,10 +305,8 @@ def humanize_drums(input_file, output_file,
             current_time += msg.time
             
             if msg.type in ['note_on', 'note_off']:
-                # Store the note with its absolute time for processing
                 drum_notes.append((current_time, msg))
             else:
-                # Non-note messages pass through unchanged
                 new_track.append(msg)
         
         # Skip if no drum notes
@@ -195,11 +346,6 @@ def humanize_drums(input_file, output_file,
                     'is_backbeat': is_backbeat,
                     'is_offbeat': is_offbeat
                 })
-        
-        # Analyze playing patterns
-        # 1. Detect common patterns (kick+hihat, snare+hihat, etc.)
-        # 2. Find tempo and possible time signature
-        # 3. Identify fills and special patterns
         
         # Find tempo by looking at hi-hat pattern
         hihat_times = sorted([bp['time'] for bp in beat_positions if bp['note'] in HIHAT_NOTES])
@@ -524,6 +670,9 @@ def main():
     parser.add_argument('--style', type=str, default="balanced", 
                         choices=["balanced", "jazzy", "rock", "precise", "loose"],
                         help='Drummer style profile (default: balanced)')
+    parser.add_argument('--library', type=str, default="gm", 
+                        choices=["gm", "ad2", "sd3", "ez2", "ssd5"],
+                        help='Drums library mapping (default: gm)')
     
     args = parser.parse_args()
     
@@ -541,7 +690,8 @@ def main():
         accent_prob=args.accent,
         shuffle_amount=args.shuffle,
         flamming_prob=args.flams,
-        drummer_style=args.style
+        drummer_style=args.style,
+        drum_library=args.library
     )
 
 if __name__ == "__main__":
