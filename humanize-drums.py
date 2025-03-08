@@ -3,15 +3,18 @@ import random
 import argparse
 import numpy as np
 from pathlib import Path
+from collections import defaultdict
 
 def humanize_drums(input_file, output_file, 
                    timing_variation=10, 
                    velocity_variation=15, 
                    ghost_note_prob=0.1,
                    accent_prob=0.2,
-                   shuffle_amount=0.0):
+                   shuffle_amount=0.0,
+                   flamming_prob=0.05,
+                   drummer_style="balanced"):
     """
-    Add human feel to a MIDI drum track.
+    Add realistic human feel to a MIDI drum track based on drumming principles.
     
     Parameters:
     -----------
@@ -29,6 +32,10 @@ def humanize_drums(input_file, output_file,
         Probability of accenting certain notes (0.0 to 1.0)
     shuffle_amount : float
         Amount of shuffle/swing feeling to add (0.0 to 0.5)
+    flamming_prob : float
+        Probability of adding flams to snare hits (0.0 to 1.0)
+    drummer_style : str
+        Style profile to apply ("balanced", "jazzy", "rock", "precise", "loose")
     """
     print(f"Loading MIDI file: {input_file}")
     midi_file = mido.MidiFile(input_file)
@@ -36,9 +43,96 @@ def humanize_drums(input_file, output_file,
     # Create a new MIDI file with the same settings
     new_midi = mido.MidiFile(ticks_per_beat=midi_file.ticks_per_beat)
     
+    # Set drummer profile characteristics
+    drummer_profiles = {
+        "balanced": {
+            "timing_bias": 0,           # Neutral timing
+            "velocity_emphasis": 1.0,    # Normal dynamics
+            "ghost_multiplier": 1.0,     # Standard ghost notes
+            "kick_timing_tightness": 1.0, # Standard kick timing
+            "hihat_variation": 1.0,      # Standard hi-hat variation
+            "rushing_factor": 0,         # No tendency to rush or drag
+            "groove_consistency": 0.7,   # Moderately consistent groove
+        },
+        "jazzy": {
+            "timing_bias": -2,          # Slightly behind the beat
+            "velocity_emphasis": 1.2,    # More dynamic range
+            "ghost_multiplier": 1.5,     # More ghost notes
+            "kick_timing_tightness": 0.7, # Looser kick timing
+            "hihat_variation": 1.3,      # More hi-hat variation
+            "rushing_factor": -0.3,      # Tendency to lay back
+            "groove_consistency": 0.6,   # Less mechanical consistency
+        },
+        "rock": {
+            "timing_bias": 2,           # Slightly ahead of the beat
+            "velocity_emphasis": 1.3,    # Stronger dynamics
+            "ghost_multiplier": 0.8,     # Fewer ghost notes
+            "kick_timing_tightness": 1.2, # Tighter kick timing
+            "hihat_variation": 0.9,      # Less hi-hat variation
+            "rushing_factor": 0.2,       # Tendency to push forward
+            "groove_consistency": 0.8,   # More consistent groove
+        },
+        "precise": {
+            "timing_bias": 0,           # On the beat
+            "velocity_emphasis": 0.8,    # Less dynamic range
+            "ghost_multiplier": 0.5,     # Fewer ghost notes
+            "kick_timing_tightness": 1.5, # Very tight kick timing
+            "hihat_variation": 0.6,      # Minimal hi-hat variation
+            "rushing_factor": 0,         # No tendency to rush or drag
+            "groove_consistency": 0.9,   # Very consistent groove
+        },
+        "loose": {
+            "timing_bias": 0,           # Variable timing
+            "velocity_emphasis": 1.4,    # Wide dynamic range
+            "ghost_multiplier": 1.7,     # Many ghost notes
+            "kick_timing_tightness": 0.6, # Loose kick timing
+            "hihat_variation": 1.5,      # Lots of hi-hat variation
+            "rushing_factor": 0.1,       # Slight tendency to push
+            "groove_consistency": 0.5,   # Inconsistent groove
+        }
+    }
+    
+    # Get selected profile, default to balanced if not found
+    profile = drummer_profiles.get(drummer_style.lower(), drummer_profiles["balanced"])
+    
+    # Common GM drum mapping
+    GM_DRUM_MAP = {
+        # Kicks
+        35: "Acoustic Bass Drum",
+        36: "Bass Drum 1",
+        # Snares
+        38: "Acoustic Snare",
+        40: "Electric Snare",
+        # Hi-hats
+        42: "Closed Hi-Hat",
+        44: "Pedal Hi-Hat",
+        46: "Open Hi-Hat",
+        # Toms
+        41: "Low Floor Tom",
+        43: "High Floor Tom",
+        45: "Low Tom",
+        47: "Low-Mid Tom",
+        48: "Hi-Mid Tom",
+        50: "High Tom",
+        # Cymbals
+        49: "Crash Cymbal 1",
+        51: "Ride Cymbal 1",
+        52: "Chinese Cymbal",
+        53: "Ride Bell",
+        55: "Splash Cymbal",
+        57: "Crash Cymbal 2",
+        59: "Ride Cymbal 2",
+    }
+    
+    # Group drum types for specialized handling
+    KICK_NOTES = [35, 36]
+    SNARE_NOTES = [38, 40]
+    HIHAT_NOTES = [42, 44, 46]
+    TOM_NOTES = [41, 43, 45, 47, 48, 50]
+    CYMBAL_NOTES = [49, 51, 52, 53, 55, 57, 59]
+    
     # Process each track
     for track_idx, track in enumerate(midi_file.tracks):
-        # Create a new track
         new_track = mido.MidiTrack()
         new_midi.tracks.append(new_track)
         
@@ -50,7 +144,7 @@ def humanize_drums(input_file, output_file,
                 break
             new_track.append(msg)
         
-        # Collect drum notes for processing
+        # Collect drum notes with absolute timing
         drum_notes = []
         current_time = 0
         
@@ -64,91 +158,342 @@ def humanize_drums(input_file, output_file,
                 # Non-note messages pass through unchanged
                 new_track.append(msg)
         
-        # Skip track if no drum notes
+        # Skip if no drum notes
         if not drum_notes:
             continue
         
-        # Group notes by their timing to identify patterns
-        grouped_notes = {}
+        # Analyze the beat structure
+        ticks_per_beat = midi_file.ticks_per_beat
+        ticks_per_measure = ticks_per_beat * 4  # Assuming 4/4 time
+        
+        # Group notes by their time to find patterns
+        notes_by_time = defaultdict(list)
         for time, msg in drum_notes:
             if msg.type == 'note_on' and msg.velocity > 0:
-                if time not in grouped_notes:
-                    grouped_notes[time] = []
-                grouped_notes[time].append(msg)
+                notes_by_time[time].append(msg)
         
-        # Sort times to process notes chronologically
-        sorted_times = sorted(grouped_notes.keys())
-        
-        # Identify common patterns (like hi-hat with kick or snare)
+        # Identify beat positions for each note
         beat_positions = []
-        for i in range(len(sorted_times)-1):
-            # Calculate distance to next note
-            interval = sorted_times[i+1] - sorted_times[i]
-            # Store beat position info
-            notes = [msg.note for msg in grouped_notes[sorted_times[i]]]
-            beat_positions.append((sorted_times[i], interval, notes))
+        times = sorted(notes_by_time.keys())
         
-        # Identify which notes are probably:
-        # - Hi-hats (often highest frequency notes)
-        # - Kicks (usually low notes, often on strong beats)
-        # - Snares (usually mid notes, often on backbeats)
-        all_notes = [msg.note for time, msg in drum_notes if msg.type == 'note_on' and msg.velocity > 0]
-        note_counts = {}
-        for note in all_notes:
-            note_counts[note] = note_counts.get(note, 0) + 1
+        for time in times:
+            # Calculate position within measure (0.0 to 4.0 for 4/4 time)
+            measure_position = (time % ticks_per_measure) / ticks_per_beat
+            # Determine if it's a strong or weak beat
+            is_downbeat = measure_position < 0.1 or abs(measure_position - 2.0) < 0.1
+            is_backbeat = abs(measure_position - 1.0) < 0.1 or abs(measure_position - 3.0) < 0.1
+            is_offbeat = not (is_downbeat or is_backbeat)
+            
+            # Store beat info with the notes
+            for note in notes_by_time[time]:
+                beat_positions.append({
+                    'time': time,
+                    'note': note.note,
+                    'velocity': note.velocity,
+                    'measure_pos': measure_position,
+                    'is_downbeat': is_downbeat,
+                    'is_backbeat': is_backbeat,
+                    'is_offbeat': is_offbeat
+                })
         
-        # Common GM drum mapping as reference
-        likely_hihat = max(note_counts.keys()) if note_counts else 42  # Default to hi-hat closed
-        likely_kick = min(note_counts.keys()) if note_counts else 36   # Default to kick
+        # Analyze playing patterns
+        # 1. Detect common patterns (kick+hihat, snare+hihat, etc.)
+        # 2. Find tempo and possible time signature
+        # 3. Identify fills and special patterns
         
-        # Process and humanize drum notes
+        # Find tempo by looking at hi-hat pattern
+        hihat_times = sorted([bp['time'] for bp in beat_positions if bp['note'] in HIHAT_NOTES])
+        hihat_intervals = []
+        for i in range(len(hihat_times) - 1):
+            interval = hihat_times[i+1] - hihat_times[i]
+            if interval > 0:
+                hihat_intervals.append(interval)
+        
+        # Find most common interval (likely the primary subdivision)
+        common_intervals = {}
+        for interval in hihat_intervals:
+            common_intervals[interval] = common_intervals.get(interval, 0) + 1
+        
+        primary_subdivision = max(common_intervals.items(), key=lambda x: x[1])[0] if common_intervals else ticks_per_beat/4
+        
+        # Detect fills by looking for dense tom patterns
+        fills = []
+        for i in range(len(times) - 1):
+            curr_time = times[i]
+            next_time = times[i+1]
+            notes_at_curr = [msg.note for msg in notes_by_time[curr_time]]
+            
+            # Check if multiple toms are hit in short succession
+            if any(note in TOM_NOTES for note in notes_at_curr) and next_time - curr_time < primary_subdivision:
+                # Mark region as potential fill
+                fill_start = max(0, curr_time - primary_subdivision * 2)
+                fill_end = min(curr_time + primary_subdivision * 8, times[-1])
+                fills.append((fill_start, fill_end))
+        
+        # Merge overlapping fill regions
+        merged_fills = []
+        for fill in sorted(fills):
+            if not merged_fills or fill[0] > merged_fills[-1][1]:
+                merged_fills.append(fill)
+            else:
+                merged_fills[-1] = (merged_fills[-1][0], max(merged_fills[-1][1], fill[1]))
+        
+        # Create groove pattern analysis
+        groove_patterns = defaultdict(list)
+        
+        # Look for repeating kick/snare patterns
+        for i in range(len(beat_positions)):
+            bp = beat_positions[i]
+            if bp['note'] in KICK_NOTES + SNARE_NOTES:
+                measure_idx = int(bp['time'] / ticks_per_measure)
+                pos_in_measure = bp['measure_pos']
+                pattern_key = (measure_idx % 2, round(pos_in_measure * 4) / 4)  # Quantize to quarter notes
+                groove_patterns[pattern_key].append(bp)
+        
+        # Humanize based on analysis
         humanized_notes = []
         
+        # Track tempo modifications for groove consistency
+        tempo_drift = 0  # cumulative drift value
+        last_tempo_update = 0  # when we last updated the drift
+        
         for time, msg in drum_notes:
             if msg.type == 'note_on' and msg.velocity > 0:
-                # Apply timing variation depending on note type
-                timing_var = random.randint(-timing_variation, timing_variation)
+                # Get measure position
+                measure_position = (time % ticks_per_measure) / ticks_per_beat
+                measure_idx = int(time / ticks_per_measure)
                 
-                # Apply more shuffle to certain notes (like hi-hats)
-                if shuffle_amount > 0 and msg.note == likely_hihat:
-                    # Determine if this is an offbeat hi-hat
-                    beat_pos = time / midi_file.ticks_per_beat
-                    is_offbeat = abs((beat_pos % 1) - 0.5) < 0.1
+                # Determine if we're in a fill section
+                in_fill = any(start <= time <= end for start, end in merged_fills)
+                
+                # Determine if this is a common pattern point
+                pattern_key = (measure_idx % 2, round(measure_position * 4) / 4)
+                is_pattern_point = pattern_key in groove_patterns
+                
+                # Tempo drift for groove consistency
+                if time - last_tempo_update > ticks_per_beat:
+                    # Update tempo drift periodically to simulate subtle tempo changes
+                    drift_factor = profile["groove_consistency"]
+                    tempo_drift = tempo_drift * drift_factor + random.uniform(-3, 3) * (1 - drift_factor)
+                    last_tempo_update = time
+                
+                # ======= TIMING HUMANIZATION =======
+                # Base timing variation based on note type and beat position
+                note_type_timing_var = 0
+                
+                # Different timing handling based on drum type
+                if msg.note in KICK_NOTES:
+                    # Kicks are often more precisely timed, especially on downbeats
+                    kick_tightness = profile["kick_timing_tightness"]
+                    if measure_position < 0.1 or abs(measure_position - 2.0) < 0.1:
+                        # Downbeats get tighter timing
+                        base_var = timing_variation * 0.6 / kick_tightness
+                    else:
+                        # Other kicks have more variation
+                        base_var = timing_variation * 0.8 / kick_tightness
                     
-                    if is_offbeat:
+                    note_type_timing_var = random.uniform(-base_var, base_var)
+                    
+                    # Kicks on downbeats might be slightly early (anticipation)
+                    if measure_position < 0.1:
+                        note_type_timing_var -= 1 + profile["rushing_factor"] * 2
+                    
+                elif msg.note in SNARE_NOTES:
+                    # Snares on backbeats are fundamental, slightly different handling
+                    if abs(measure_position - 1.0) < 0.1 or abs(measure_position - 3.0) < 0.1:
+                        # Backbeats might be slightly late for a relaxed feel or early for an energetic feel
+                        note_type_timing_var = random.uniform(-timing_variation * 0.7, timing_variation * 0.7)
+                        note_type_timing_var += profile["timing_bias"]
+                    else:
+                        # Other snares (often syncopations or fills)
+                        note_type_timing_var = random.uniform(-timing_variation, timing_variation)
+                
+                elif msg.note in HIHAT_NOTES:
+                    # Hi-hats have their own feel - experienced drummers often push/pull these
+                    hihat_var = timing_variation * profile["hihat_variation"]
+                    note_type_timing_var = random.uniform(-hihat_var, hihat_var)
+                    
+                    # Shuffle feel applied to offbeat hi-hats
+                    is_offbeat = abs((measure_position % 1.0) - 0.5) < 0.1
+                    if shuffle_amount > 0 and is_offbeat:
                         # Push offbeats later for shuffle feel
-                        shuffle_shift = int(shuffle_amount * midi_file.ticks_per_beat)
-                        timing_var += shuffle_shift
+                        shuffle_shift = int(shuffle_amount * ticks_per_beat/2)
+                        note_type_timing_var += shuffle_shift
+                    
+                    # Hi-hat timing often correlates with the kick/snare pattern
+                    # Check if there's a kick or snare at this time
+                    other_drums = [n.note for n in notes_by_time.get(time, [])]
+                    if any(n in KICK_NOTES for n in other_drums):
+                        # Hi-hats with kicks are often more precisely aligned
+                        note_type_timing_var *= 0.7
                 
-                # Apply velocity variation based on note type
-                new_velocity = msg.velocity
+                elif msg.note in CYMBAL_NOTES:
+                    # Cymbals often have more variation and might be slightly ahead for emphasis
+                    note_type_timing_var = random.uniform(-timing_variation * 1.2, timing_variation * 1.2)
+                    # Crashes often anticipate slightly
+                    if msg.note in [49, 57] and measure_position < 0.1:
+                        note_type_timing_var -= 2 + profile["rushing_factor"] * 3
                 
-                # Accent certain notes
-                if random.random() < accent_prob:
-                    # Increase velocity for accents
-                    new_velocity = min(127, new_velocity + random.randint(10, 25))
+                elif msg.note in TOM_NOTES:
+                    # Toms in fills often have deliberate timing for effect
+                    if in_fill:
+                        # More variation in fills, but with pattern consistency
+                        seed = int(time / (ticks_per_beat/4))
+                        random.seed(seed)  # Use consistent seed for similar positions
+                        note_type_timing_var = random.uniform(-timing_variation * 1.3, timing_variation * 1.3)
+                        random.seed()  # Reset seed
+                    else:
+                        # Regular tom hits
+                        note_type_timing_var = random.uniform(-timing_variation, timing_variation)
+                
                 else:
-                    # Normal velocity variation
-                    new_velocity += random.randint(-velocity_variation, velocity_variation)
-                    new_velocity = max(1, min(127, new_velocity))
+                    # Other percussion
+                    note_type_timing_var = random.uniform(-timing_variation, timing_variation)
                 
-                # Occasionally add ghost notes for snares and toms
-                if msg.note not in [likely_hihat, likely_kick] and random.random() < ghost_note_prob:
-                    # Create a ghost note with lower velocity
-                    ghost_velocity = max(1, msg.velocity - random.randint(40, 60))
-                    ghost_time = time - random.randint(midi_file.ticks_per_beat//8, midi_file.ticks_per_beat//4)
-                    if ghost_time > 0:
-                        ghost_note = msg.copy(velocity=ghost_velocity)
-                        humanized_notes.append((ghost_time, ghost_note))
+                # Apply rushing/dragging tendency of the drummer
+                rushing_component = profile["rushing_factor"] * 5
+                if measure_position < 0.1:  # Downbeats often have different timing tendencies
+                    rushing_component *= 0.5
                 
-                # Add the humanized note
+                # Apply groove consistency by maintaining similar variations at pattern points
+                groove_component = 0
+                if is_pattern_point and profile["groove_consistency"] > 0.6:
+                    # Use pattern-based variation for consistent groove
+                    pattern_seed = hash((pattern_key[0], pattern_key[1], msg.note))
+                    random.seed(pattern_seed)
+                    groove_component = random.uniform(-timing_variation * 0.5, timing_variation * 0.5)
+                    random.seed()  # Reset seed
+                
+                # Combine all timing factors
+                total_timing_var = int(note_type_timing_var + rushing_component + groove_component + tempo_drift)
+                
+                # Limit maximum variation
+                total_timing_var = max(-timing_variation*2, min(timing_variation*2, total_timing_var))
+                
+                # ======= VELOCITY HUMANIZATION =======
+                # Base velocity adjustment
+                new_velocity = msg.velocity
+                velocity_var = 0
+                
+                # Apply different velocity patterns based on drum type and beat position
+                if msg.note in KICK_NOTES:
+                    # Kicks on downbeats are often stronger
+                    if measure_position < 0.1 or abs(measure_position - 2.0) < 0.1:
+                        velocity_var = random.randint(-5, 15) * profile["velocity_emphasis"]
+                    else:
+                        velocity_var = random.randint(-10, 10) * profile["velocity_emphasis"]
+                
+                elif msg.note in SNARE_NOTES:
+                    # Snares on backbeats are often accented
+                    if abs(measure_position - 1.0) < 0.1 or abs(measure_position - 3.0) < 0.1:
+                        # Backbeat emphasis
+                        velocity_var = random.randint(-5, 15) * profile["velocity_emphasis"]
+                        # Sometimes really accent these
+                        if random.random() < accent_prob * 1.5:
+                            velocity_var += random.randint(10, 20)
+                    else:
+                        velocity_var = random.randint(-10, 10) * profile["velocity_emphasis"]
+                
+                elif msg.note in HIHAT_NOTES:
+                    # Hi-hats often have a specific pattern of accents
+                    eighth_note_pos = round(measure_position * 8) / 8
+                    
+                    # Common hi-hat accent patterns
+                    if eighth_note_pos in [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5]:  # Eighth notes
+                        # Quarter notes often stronger than eighth notes
+                        if eighth_note_pos in [0, 1, 2, 3]:
+                            velocity_var = random.randint(-5, 15) * profile["velocity_emphasis"]
+                        else:
+                            velocity_var = random.randint(-15, 5) * profile["velocity_emphasis"]
+                
+                elif msg.note in CYMBAL_NOTES:
+                    # Cymbals at phrase beginnings are stronger
+                    if measure_position < 0.1 and measure_idx % 2 == 0:
+                        velocity_var = random.randint(0, 20) * profile["velocity_emphasis"]
+                    else:
+                        velocity_var = random.randint(-10, 15) * profile["velocity_emphasis"]
+                
+                elif msg.note in TOM_NOTES:
+                    # Toms in fills often have dynamic shaping
+                    if in_fill:
+                        # Find position in the fill
+                        fill_idx = [(s, e) for s, e in merged_fills if s <= time <= e][0]
+                        fill_start, fill_end = fill_idx
+                        fill_position = (time - fill_start) / (fill_end - fill_start)
+                        
+                        # Common fill velocity shape: crescendo or decrescendo
+                        if random.random() < 0.7:  # crescendo (most common)
+                            velocity_var = int((fill_position * 30 - 10) * profile["velocity_emphasis"])
+                        else:  # decrescendo
+                            velocity_var = int(((1 - fill_position) * 30 - 10) * profile["velocity_emphasis"])
+                    else:
+                        velocity_var = random.randint(-15, 15) * profile["velocity_emphasis"]
+                
+                else:
+                    # Other percussion
+                    velocity_var = random.randint(-velocity_variation, velocity_variation)
+                
+                # Apply accent probability
+                if random.random() < accent_prob:
+                    # Increase velocity for accents based on style
+                    accent_amount = random.randint(10, 25) * profile["velocity_emphasis"]
+                    velocity_var += accent_amount
+                
+                # Apply final velocity adjustment
+                new_velocity = max(1, min(127, msg.velocity + int(velocity_var)))
+                
+                # ======= GHOST NOTES =======
+                # Add ghost notes based on drum type and position
+                if msg.note in SNARE_NOTES:
+                    # Snares frequently have ghost notes
+                    ghost_prob = ghost_note_prob * profile["ghost_multiplier"]
+                    
+                    # More likely to add ghosts before backbeats
+                    if abs(measure_position - 1.0) < 0.2 or abs(measure_position - 3.0) < 0.2:
+                        ghost_prob *= 1.5
+                    
+                    if random.random() < ghost_prob:
+                        # Create a ghost note with lower velocity
+                        ghost_velocity = max(1, min(msg.velocity - random.randint(40, 60), 30))
+                        # Ghost notes usually just before the main beat
+                        ghost_offset = random.randint(ticks_per_beat//16, ticks_per_beat//8)
+                        ghost_time = time - ghost_offset
+                        
+                        if ghost_time > 0:
+                            ghost_note = msg.copy(velocity=ghost_velocity)
+                            humanized_notes.append((ghost_time, ghost_note))
+                
+                elif msg.note in TOM_NOTES and not in_fill:
+                    # Occasional ghost notes on toms outside of fills
+                    if random.random() < ghost_note_prob * 0.7 * profile["ghost_multiplier"]:
+                        ghost_velocity = max(1, min(msg.velocity - random.randint(40, 60), 35))
+                        ghost_time = time - random.randint(ticks_per_beat//16, ticks_per_beat//8)
+                        
+                        if ghost_time > 0:
+                            ghost_note = msg.copy(velocity=ghost_velocity)
+                            humanized_notes.append((ghost_time, ghost_note))
+                
+                # ======= FLAMS =======
+                # Add flams (quick double hits) to snares occasionally
+                if msg.note in SNARE_NOTES and random.random() < flamming_prob:
+                    # Flam is a quieter note right before the main hit
+                    flam_velocity = max(1, int(new_velocity * 0.7))
+                    flam_offset = random.randint(3, 10)  # Very close to the main hit
+                    flam_time = time - flam_offset
+                    
+                    if flam_time > 0:
+                        flam_note = msg.copy(velocity=flam_velocity)
+                        humanized_notes.append((flam_time, flam_note))
+                
+                # Add the main humanized note
                 humanized_note = msg.copy(velocity=new_velocity)
-                humanized_notes.append((time + timing_var, humanized_note))
+                humanized_time = max(0, time + total_timing_var)
+                humanized_notes.append((humanized_time, humanized_note))
             
             elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
-                # Also adjust note-off timing proportionally
-                timing_var = random.randint(-timing_variation, timing_variation)
-                humanized_notes.append((time + timing_var, msg))
+                # Adjust note-off timing relative to the note-on
+                timing_var = random.randint(-timing_variation//2, timing_variation//2)
+                humanized_notes.append((max(0, time + timing_var), msg))
         
         # Sort humanized notes by time
         humanized_notes.sort(key=lambda x: x[0])
@@ -156,9 +501,6 @@ def humanize_drums(input_file, output_file,
         # Convert back to relative timing
         last_time = 0
         for abs_time, msg in humanized_notes:
-            if abs_time < 0:
-                abs_time = 0  # Ensure no negative times
-            
             # Calculate relative time
             msg_copy = msg.copy(time=abs_time - last_time)
             new_track.append(msg_copy)
@@ -167,10 +509,10 @@ def humanize_drums(input_file, output_file,
     # Save the humanized MIDI file
     print(f"Saving humanized MIDI to: {output_file}")
     new_midi.save(output_file)
-    print("Done!")
+    print("Done! Applied drummer style:", drummer_style)
 
 def main():
-    parser = argparse.ArgumentParser(description='Humanize MIDI drum tracks')
+    parser = argparse.ArgumentParser(description='Humanize MIDI drum tracks with realistic drummer feel')
     parser.add_argument('input_file', help='Input MIDI file path')
     parser.add_argument('--output', '-o', help='Output MIDI file path (default: input_file_humanized.mid)')
     parser.add_argument('--timing', '-t', type=int, default=10, help='Timing variation in ticks (default: 10)')
@@ -178,6 +520,10 @@ def main():
     parser.add_argument('--ghost', '-g', type=float, default=0.1, help='Ghost note probability (default: 0.1)')
     parser.add_argument('--accent', '-a', type=float, default=0.2, help='Accent probability (default: 0.2)')
     parser.add_argument('--shuffle', '-s', type=float, default=0.0, help='Shuffle amount, 0.0-0.5 (default: 0.0)')
+    parser.add_argument('--flams', '-f', type=float, default=0.05, help='Flam probability (default: 0.05)')
+    parser.add_argument('--style', type=str, default="balanced", 
+                        choices=["balanced", "jazzy", "rock", "precise", "loose"],
+                        help='Drummer style profile (default: balanced)')
     
     args = parser.parse_args()
     
@@ -193,7 +539,9 @@ def main():
         velocity_variation=args.velocity,
         ghost_note_prob=args.ghost,
         accent_prob=args.accent,
-        shuffle_amount=args.shuffle
+        shuffle_amount=args.shuffle,
+        flamming_prob=args.flams,
+        drummer_style=args.style
     )
 
 if __name__ == "__main__":
