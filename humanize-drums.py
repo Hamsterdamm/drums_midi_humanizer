@@ -5,6 +5,236 @@ import numpy as np
 from pathlib import Path
 from collections import defaultdict
 
+
+# Set drummer profile characteristics
+drummer_profiles = {
+    "balanced": {
+        "timing_bias": 0,           # Neutral timing
+        "velocity_emphasis": 1.0,    # Normal dynamics
+        "ghost_multiplier": 1.0,     # Standard ghost notes
+        "kick_timing_tightness": 1.0, # Standard kick timing
+        "hihat_variation": 1.0,      # Standard hi-hat variation
+        "rushing_factor": 0,         # No tendency to rush or drag
+        "groove_consistency": 0.7,   # Moderately consistent groove
+    },
+    "jazzy": {
+        "timing_bias": -2,          # Slightly behind the beat
+        "velocity_emphasis": 1.2,    # More dynamic range
+        "ghost_multiplier": 1.5,     # More ghost notes
+        "kick_timing_tightness": 0.7, # Looser kick timing
+        "hihat_variation": 1.3,      # More hi-hat variation
+        "rushing_factor": -0.3,      # Tendency to lay back
+        "groove_consistency": 0.6,   # Less mechanical consistency
+    },
+    "rock": {
+        "timing_bias": 2,           # Slightly ahead of the beat
+        "velocity_emphasis": 1.3,    # Stronger dynamics
+        "ghost_multiplier": 0.8,     # Fewer ghost notes
+        "kick_timing_tightness": 1.2, # Tighter kick timing
+        "hihat_variation": 0.9,      # Less hi-hat variation
+        "rushing_factor": 0.2,       # Tendency to push forward
+        "groove_consistency": 0.8,   # More consistent groove
+    },
+    "precise": {
+        "timing_bias": 0,           # On the beat
+        "velocity_emphasis": 0.8,    # Less dynamic range
+        "ghost_multiplier": 0.5,     # Fewer ghost notes
+        "kick_timing_tightness": 1.5, # Very tight kick timing
+        "hihat_variation": 0.6,      # Minimal hi-hat variation
+        "rushing_factor": 0,         # No tendency to rush or drag
+        "groove_consistency": 0.9,   # Very consistent groove
+    },
+    "loose": {
+        "timing_bias": 0,           # Variable timing
+        "velocity_emphasis": 1.4,    # Wide dynamic range
+        "ghost_multiplier": 1.7,     # Many ghost notes
+        "kick_timing_tightness": 0.6, # Loose kick timing
+        "hihat_variation": 1.5,      # Lots of hi-hat variation
+        "rushing_factor": 0.1,       # Slight tendency to push
+        "groove_consistency": 0.5,   # Inconsistent groove
+    }
+}
+
+   
+# General MIDI Drum Mapping (GM)
+GM_DRUM_MAP = {
+    # Kicks
+    35: "Acoustic Bass Drum",
+    36: "Bass Drum 1",
+    # Snares
+    38: "Acoustic Snare",
+    40: "Electric Snare",
+    # Hi-hats
+    42: "Closed Hi-Hat",
+    44: "Pedal Hi-Hat",
+    46: "Open Hi-Hat",
+    # Toms
+    41: "Low Floor Tom",
+    43: "High Floor Tom",
+    45: "Low Tom",
+    47: "Low-Mid Tom",
+    48: "Hi-Mid Tom",
+    50: "High Tom",
+    # Cymbals
+    49: "Crash Cymbal 1",
+    51: "Ride Cymbal 1",
+    52: "Chinese Cymbal",
+    53: "Ride Bell",
+    55: "Splash Cymbal",
+    57: "Crash Cymbal 2",
+    59: "Ride Cymbal 2",
+}
+
+# Addictive Drums 2 Mapping
+AD2_DRUM_MAP = {
+    # Kicks
+    36: "Kick",
+    # Snares
+    38: "Snare Center",
+    40: "Snare Rimshot",
+    37: "Snare Sidestick",
+    # Hi-hats
+    42: "HH Closed Tip",
+    22: "HH Closed Shank",
+    44: "HH Pedal",
+    46: "HH Open",
+    26: "HH Half Open",
+    # Toms
+    41: "Tom 1",
+    43: "Tom 2",
+    45: "Tom 3",
+    48: "Tom 4",
+    # Cymbals
+    49: "Crash 1",
+    57: "Crash 2",
+    52: "China",
+    55: "Splash",
+    51: "Ride Tip",
+    59: "Ride Crash",
+    53: "Ride Bell",
+}
+
+# Superior Drummer 3 Mapping
+SD3_DRUM_MAP = {
+    # Kicks
+    36: "Kick Right",
+    35: "Kick Left",
+    # Snares
+    38: "Snare Center",
+    40: "Snare Rimshot",
+    37: "Snare Sidestick",
+    39: "Snare Rimclick",
+    # Hi-hats
+    42: "HH Closed Tip",
+    22: "HH Closed Shank",
+    44: "HH Pedal",
+    46: "HH Open Tip",
+    26: "HH Half Open Tip",
+    # Toms
+    48: "Tom 1",
+    45: "Tom 2",
+    43: "Tom 3",
+    41: "Tom 4",
+    # Cymbals
+    49: "Crash 1 Tip",
+    57: "Crash 2 Tip",
+    55: "Splash Tip",
+    52: "China Tip",
+    51: "Ride Tip",
+    53: "Ride Bell",
+    59: "Ride Edge",
+}
+
+# EZdrummer 2 Mapping
+EZ2_DRUM_MAP = {
+    # Kicks
+    36: "Kick",
+    # Snares
+    38: "Snare Center",
+    40: "Snare Rimshot",
+    37: "Snare Sidestick",
+    # Hi-hats
+    42: "HH Closed Tip",
+    22: "HH Closed Shank",
+    44: "HH Pedal",
+    46: "HH Open",
+    26: "HH Half Open",
+    # Toms
+    48: "Tom 1",
+    45: "Tom 2",
+    43: "Tom 3",
+    41: "Tom 4", 
+    # Cymbals
+    49: "Crash 1",
+    57: "Crash 2",
+    55: "Splash",
+    52: "China",
+    51: "Ride Tip",
+    53: "Ride Bell",
+    59: "Ride Edge",
+}
+
+# Steven Slate Drums 5 Mapping
+SSD5_DRUM_MAP = {
+    # Kicks
+    36: "Kick",
+    # Snares
+    38: "Snare Center",
+    40: "Snare Rimshot",
+    37: "Snare Sidestick",
+    # Hi-hats
+    42: "HH Closed",
+    44: "HH Pedal",
+    46: "HH Open",
+    # Toms
+    41: "Tom 4 (Floor)",
+    43: "Tom 3 (Floor)",
+    45: "Tom 2 (Mid)",
+    48: "Tom 1 (High)",
+    # Cymbals
+    49: "Crash 1",
+    57: "Crash 2",
+    55: "Splash",
+    52: "China",
+    51: "Ride Bow",
+    53: "Ride Bell",
+    59: "Ride Edge",
+}
+
+# Select the appropriate drum map based on the library
+drum_maps = {
+    "gm": GM_DRUM_MAP,
+    "ad2": AD2_DRUM_MAP,
+    "sd3": SD3_DRUM_MAP,
+    "ez2": EZ2_DRUM_MAP,
+    "ssd5": SSD5_DRUM_MAP
+}
+    
+    
+# Group drum types for specialized handling based on selected mapping
+def get_note_groups(drum_map):
+    kick_notes = []
+    snare_notes = []
+    hihat_notes = []
+    tom_notes = []
+    cymbal_notes = []
+    
+    for note, name in drum_map.items():
+        name_lower = name.lower()
+        if "kick" in name_lower or "bass drum" in name_lower:
+            kick_notes.append(note)
+        elif "snare" in name_lower:
+            snare_notes.append(note)
+        elif "hh" in name_lower or "hi-hat" in name_lower or "hihat" in name_lower:
+            hihat_notes.append(note)
+        elif "tom" in name_lower:
+            tom_notes.append(note)
+        elif any(x in name_lower for x in ["crash", "ride", "china", "splash"]):
+            cymbal_notes.append(note)
+    
+    return kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes
+
+
 def humanize_drums(input_file, output_file, 
                    timing_variation=10, 
                    velocity_variation=15, 
@@ -50,55 +280,6 @@ def humanize_drums(input_file, output_file,
     # Create a new MIDI file with the same settings
     new_midi = mido.MidiFile(ticks_per_beat=midi_file.ticks_per_beat)
     
-    # Set drummer profile characteristics
-    drummer_profiles = {
-        "balanced": {
-            "timing_bias": 0,           # Neutral timing
-            "velocity_emphasis": 1.0,    # Normal dynamics
-            "ghost_multiplier": 1.0,     # Standard ghost notes
-            "kick_timing_tightness": 1.0, # Standard kick timing
-            "hihat_variation": 1.0,      # Standard hi-hat variation
-            "rushing_factor": 0,         # No tendency to rush or drag
-            "groove_consistency": 0.7,   # Moderately consistent groove
-        },
-        "jazzy": {
-            "timing_bias": -2,          # Slightly behind the beat
-            "velocity_emphasis": 1.2,    # More dynamic range
-            "ghost_multiplier": 1.5,     # More ghost notes
-            "kick_timing_tightness": 0.7, # Looser kick timing
-            "hihat_variation": 1.3,      # More hi-hat variation
-            "rushing_factor": -0.3,      # Tendency to lay back
-            "groove_consistency": 0.6,   # Less mechanical consistency
-        },
-        "rock": {
-            "timing_bias": 2,           # Slightly ahead of the beat
-            "velocity_emphasis": 1.3,    # Stronger dynamics
-            "ghost_multiplier": 0.8,     # Fewer ghost notes
-            "kick_timing_tightness": 1.2, # Tighter kick timing
-            "hihat_variation": 0.9,      # Less hi-hat variation
-            "rushing_factor": 0.2,       # Tendency to push forward
-            "groove_consistency": 0.8,   # More consistent groove
-        },
-        "precise": {
-            "timing_bias": 0,           # On the beat
-            "velocity_emphasis": 0.8,    # Less dynamic range
-            "ghost_multiplier": 0.5,     # Fewer ghost notes
-            "kick_timing_tightness": 1.5, # Very tight kick timing
-            "hihat_variation": 0.6,      # Minimal hi-hat variation
-            "rushing_factor": 0,         # No tendency to rush or drag
-            "groove_consistency": 0.9,   # Very consistent groove
-        },
-        "loose": {
-            "timing_bias": 0,           # Variable timing
-            "velocity_emphasis": 1.4,    # Wide dynamic range
-            "ghost_multiplier": 1.7,     # Many ghost notes
-            "kick_timing_tightness": 0.6, # Loose kick timing
-            "hihat_variation": 1.5,      # Lots of hi-hat variation
-            "rushing_factor": 0.1,       # Slight tendency to push
-            "groove_consistency": 0.5,   # Inconsistent groove
-        }
-    }
-    
     # Get selected profile, default to balanced if not found
     profile = drummer_profiles.get(drummer_style.lower(), drummer_profiles["balanced"])
     
@@ -106,185 +287,8 @@ def humanize_drums(input_file, output_file,
     # Drum Library MIDI Mappings
     # ----------------------------------
     
-    # General MIDI Drum Mapping (GM)
-    GM_DRUM_MAP = {
-        # Kicks
-        35: "Acoustic Bass Drum",
-        36: "Bass Drum 1",
-        # Snares
-        38: "Acoustic Snare",
-        40: "Electric Snare",
-        # Hi-hats
-        42: "Closed Hi-Hat",
-        44: "Pedal Hi-Hat",
-        46: "Open Hi-Hat",
-        # Toms
-        41: "Low Floor Tom",
-        43: "High Floor Tom",
-        45: "Low Tom",
-        47: "Low-Mid Tom",
-        48: "Hi-Mid Tom",
-        50: "High Tom",
-        # Cymbals
-        49: "Crash Cymbal 1",
-        51: "Ride Cymbal 1",
-        52: "Chinese Cymbal",
-        53: "Ride Bell",
-        55: "Splash Cymbal",
-        57: "Crash Cymbal 2",
-        59: "Ride Cymbal 2",
-    }
-    
-    # Addictive Drums 2 Mapping
-    AD2_DRUM_MAP = {
-        # Kicks
-        36: "Kick",
-        # Snares
-        38: "Snare Center",
-        40: "Snare Rimshot",
-        37: "Snare Sidestick",
-        # Hi-hats
-        42: "HH Closed Tip",
-        22: "HH Closed Shank",
-        44: "HH Pedal",
-        46: "HH Open",
-        26: "HH Half Open",
-        # Toms
-        41: "Tom 1",
-        43: "Tom 2",
-        45: "Tom 3",
-        48: "Tom 4",
-        # Cymbals
-        49: "Crash 1",
-        57: "Crash 2",
-        52: "China",
-        55: "Splash",
-        51: "Ride Tip",
-        59: "Ride Crash",
-        53: "Ride Bell",
-    }
-    
-    # Superior Drummer 3 Mapping
-    SD3_DRUM_MAP = {
-        # Kicks
-        36: "Kick Right",
-        35: "Kick Left",
-        # Snares
-        38: "Snare Center",
-        40: "Snare Rimshot",
-        37: "Snare Sidestick",
-        39: "Snare Rimclick",
-        # Hi-hats
-        42: "HH Closed Tip",
-        22: "HH Closed Shank",
-        44: "HH Pedal",
-        46: "HH Open Tip",
-        26: "HH Half Open Tip",
-        # Toms
-        48: "Tom 1",
-        45: "Tom 2",
-        43: "Tom 3",
-        41: "Tom 4",
-        # Cymbals
-        49: "Crash 1 Tip",
-        57: "Crash 2 Tip",
-        55: "Splash Tip",
-        52: "China Tip",
-        51: "Ride Tip",
-        53: "Ride Bell",
-        59: "Ride Edge",
-    }
-    
-    # EZdrummer 2 Mapping
-    EZ2_DRUM_MAP = {
-        # Kicks
-        36: "Kick",
-        # Snares
-        38: "Snare Center",
-        40: "Snare Rimshot",
-        37: "Snare Sidestick",
-        # Hi-hats
-        42: "HH Closed Tip",
-        22: "HH Closed Shank",
-        44: "HH Pedal",
-        46: "HH Open",
-        26: "HH Half Open",
-        # Toms
-        48: "Tom 1",
-        45: "Tom 2",
-        43: "Tom 3",
-        41: "Tom 4", 
-        # Cymbals
-        49: "Crash 1",
-        57: "Crash 2",
-        55: "Splash",
-        52: "China",
-        51: "Ride Tip",
-        53: "Ride Bell",
-        59: "Ride Edge",
-    }
-    
-    # Steven Slate Drums 5 Mapping
-    SSD5_DRUM_MAP = {
-        # Kicks
-        36: "Kick",
-        # Snares
-        38: "Snare Center",
-        40: "Snare Rimshot",
-        37: "Snare Sidestick",
-        # Hi-hats
-        42: "HH Closed",
-        44: "HH Pedal",
-        46: "HH Open",
-        # Toms
-        41: "Tom 4 (Floor)",
-        43: "Tom 3 (Floor)",
-        45: "Tom 2 (Mid)",
-        48: "Tom 1 (High)",
-        # Cymbals
-        49: "Crash 1",
-        57: "Crash 2",
-        55: "Splash",
-        52: "China",
-        51: "Ride Bow",
-        53: "Ride Bell",
-        59: "Ride Edge",
-    }
-    
-    # Select the appropriate drum map based on the library
-    drum_maps = {
-        "gm": GM_DRUM_MAP,
-        "ad2": AD2_DRUM_MAP,
-        "sd3": SD3_DRUM_MAP,
-        "ez2": EZ2_DRUM_MAP,
-        "ssd5": SSD5_DRUM_MAP
-    }
-    
     selected_map = drum_maps.get(drum_library.lower(), GM_DRUM_MAP)
     print(f"Using drum library mapping: {drum_library.upper() if drum_library.lower() in drum_maps else 'General MIDI'}")
-    
-    # Group drum types for specialized handling based on selected mapping
-    def get_note_groups(drum_map):
-        kick_notes = []
-        snare_notes = []
-        hihat_notes = []
-        tom_notes = []
-        cymbal_notes = []
-        
-        for note, name in drum_map.items():
-            name_lower = name.lower()
-            if "kick" in name_lower or "bass drum" in name_lower:
-                kick_notes.append(note)
-            elif "snare" in name_lower:
-                snare_notes.append(note)
-            elif "hh" in name_lower or "hi-hat" in name_lower or "hihat" in name_lower:
-                hihat_notes.append(note)
-            elif "tom" in name_lower:
-                tom_notes.append(note)
-            elif any(x in name_lower for x in ["crash", "ride", "china", "splash"]):
-                cymbal_notes.append(note)
-        
-        return kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes
     
     KICK_NOTES, SNARE_NOTES, HIHAT_NOTES, TOM_NOTES, CYMBAL_NOTES = get_note_groups(selected_map)
     
