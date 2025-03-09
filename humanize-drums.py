@@ -210,7 +210,7 @@ drum_maps = {
     "ssd5": SSD5_DRUM_MAP
 }
     
-    
+
 # Group drum types for specialized handling based on selected mapping
 def get_note_groups(drum_map):
     kick_notes = []
@@ -319,24 +319,17 @@ def humanize_drums(input_file, output_file,
                 bpm = 60000000 / current_tempo
                 print(f"Found tempo: {bpm:.1f} BPM")
         
-        # Copy metadata messages directly
-        metadata_end_idx = 0
-        for i, msg in enumerate(track):
-            if msg.type in ['note_on', 'note_off']:
-                metadata_end_idx = i
-                break
-            new_track.append(msg)
-        
         # Collect drum notes with absolute timing
         drum_notes = []
         current_time = 0
         
-        for msg in track[metadata_end_idx:]:
+        for msg in track:
             current_time += msg.time
             
             if msg.type in ['note_on', 'note_off']:
                 drum_notes.append((current_time, msg))
             else:
+                # Copy metadata messages directly
                 new_track.append(msg)
         
         # Skip if no drum notes
