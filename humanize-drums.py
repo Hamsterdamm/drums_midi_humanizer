@@ -238,7 +238,7 @@ def get_note_groups(drum_map):
 def humanize_drums(input_file, output_file, 
                    timing_variation=10, 
                    velocity_variation=15, 
-                   ghost_note_prob=0.1,
+                   ghost_note_prob=0.0,
                    accent_prob=0.2,
                    shuffle_amount=0.0,
                    flamming_prob=0.0,
@@ -677,11 +677,9 @@ def humanize_drums(input_file, output_file,
                 humanized_note = msg.copy(velocity=new_velocity) if new_velocity>0 else msg.copy
                 humanized_time = max(0, time + total_timing_var)
                 humanized_notes.append((humanized_time, humanized_note))
-            
-            elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
-                # Adjust note-off timing relative to the note-on
-                timing_var = random.randint(-timing_variation//2, timing_variation//2)
-                humanized_notes.append((max(0, time + timing_var), msg))
+                
+                # Add the corresponding note_off event
+                humanized_notes.append((humanized_time+ticks_per_beat//8, mido.Message('note_off', channel=humanized_note.channel, note=humanized_note.note, velocity=humanized_note.velocity, time=0)))
         
         # Sort humanized notes by time
         humanized_notes.sort(key=lambda x: x[0])
@@ -705,7 +703,7 @@ def main():
     parser.add_argument('--output', '-o', help='Output MIDI file path (default: input_file_humanized.mid)')
     parser.add_argument('--timing', '-t', type=int, default=10, help='Timing variation in ticks (default: 10)')
     parser.add_argument('--velocity', '-v', type=int, default=15, help='Velocity variation (default: 15)')
-    parser.add_argument('--ghost', '-g', type=float, default=0.1, help='Ghost note probability (default: 0.1)')
+    parser.add_argument('--ghost', '-g', type=float, default=0.0, help='Ghost note probability (default: 0.0)')
     parser.add_argument('--accent', '-a', type=float, default=0.2, help='Accent probability (default: 0.2)')
     parser.add_argument('--shuffle', '-s', type=float, default=0.0, help='Shuffle amount, 0.0-0.5 (default: 0.0)')
     parser.add_argument('--flams', '-f', type=float, default=0.0, help='Flam probability (default: 0.0)')
