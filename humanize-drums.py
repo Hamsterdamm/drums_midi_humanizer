@@ -130,6 +130,11 @@ SD3_DRUM_MAP = {
     44: "HH Pedal",
     46: "HH Open Tip",
     26: "HH Half Open Tip",
+    61: "HH Closed Tip",
+    64: "HH Closed Shank",
+    63: "HH Tight Tip",
+    62: "HH Tight Shank",
+    64: "HH Open",
     # Toms
     48: "Tom 1",
     45: "Tom 2",
@@ -159,6 +164,11 @@ EZ2_DRUM_MAP = {
     44: "HH Pedal",
     46: "HH Open",
     26: "HH Half Open",
+    61: "HH Closed Tip",
+    64: "HH Closed Shank",
+    63: "HH Tight Tip",
+    62: "HH Tight Shank",
+    64: "HH Open",
     # Toms
     48: "Tom 1",
     45: "Tom 2",
@@ -330,7 +340,8 @@ def humanize_drums(input_file, output_file,
                 drum_notes.append((current_time, msg))
             else:
                 # Copy metadata messages directly
-                new_track.append(msg)
+                # new_track.append(msg)
+                pass
         
         # Skip if no drum notes
         if not drum_notes:
@@ -563,20 +574,20 @@ def humanize_drums(input_file, output_file,
                 if msg.note in KICK_NOTES:
                     # Kicks on downbeats are often stronger
                     if measure_position < 0.1 or any(abs(measure_position - i) < 0.1 for i in range(2, time_sig_numerator, 2)):
-                        velocity_var = random.randint(-5, 15) * profile["velocity_emphasis"]
+                        velocity_var = random.randint(0, 15) * profile["velocity_emphasis"]
                     else:
-                        velocity_var = random.randint(-10, 10) * profile["velocity_emphasis"]
+                        velocity_var = random.randint(-10, 0) * profile["velocity_emphasis"]
                 
                 elif msg.note in SNARE_NOTES:
                     # Snares on backbeats are often accented
                     if any(abs(measure_position - i) < 0.1 for i in range(1, time_sig_numerator, 2)):
                         # Backbeat emphasis
-                        velocity_var = random.randint(-5, 15) * profile["velocity_emphasis"]
+                        velocity_var = random.randint(0, 15) * profile["velocity_emphasis"]
                         # Sometimes really accent these
                         if random.random() < accent_prob * 1.5:
-                            velocity_var += random.randint(10, 20)
+                            velocity_var += random.randint(0, 5)
                     else:
-                        velocity_var = random.randint(-10, 10) * profile["velocity_emphasis"]
+                        velocity_var = random.randint(-10, 0) * profile["velocity_emphasis"]
                 
                 elif msg.note in HIHAT_NOTES:
                     # Hi-hats often have a specific pattern of accents
@@ -585,18 +596,18 @@ def humanize_drums(input_file, output_file,
                     
                     # Quarter notes often stronger than eighth or sixteenth notes
                     if sixteenth_note_pos.is_integer():
-                        velocity_var = random.randint(-5, 15) * profile["velocity_emphasis"]
+                        velocity_var = random.randint(0, 15) * profile["velocity_emphasis"]
                     elif sixteenth_note_pos * 2 == round(sixteenth_note_pos * 2):  # Eighth notes
-                        velocity_var = random.randint(-10, 10) * profile["velocity_emphasis"]
+                        velocity_var = random.randint(0, 5) * profile["velocity_emphasis"]
                     else:  # Sixteenth notes
-                        velocity_var = random.randint(-15, 5) * profile["velocity_emphasis"]
+                        velocity_var = random.randint(-15, 0) * profile["velocity_emphasis"]
                 
                 elif msg.note in CYMBAL_NOTES:
                     # Cymbals at phrase beginnings are stronger
                     if measure_position < 0.1 and measure_idx % 2 == 0:
                         velocity_var = random.randint(0, 20) * profile["velocity_emphasis"]
                     else:
-                        velocity_var = random.randint(-10, 15) * profile["velocity_emphasis"]
+                        velocity_var = random.randint(-10, 0) * profile["velocity_emphasis"]
                 
                 elif msg.note in TOM_NOTES:
                     # Toms in fills often have dynamic shaping
@@ -624,7 +635,7 @@ def humanize_drums(input_file, output_file,
                 # Apply accent probability
                 if random.random() < accent_prob:
                     # Increase velocity for accents based on style
-                    accent_amount = random.randint(10, 25) * profile["velocity_emphasis"]
+                    accent_amount = random.randint(0, 5) * profile["velocity_emphasis"]
                     velocity_var += accent_amount
                 
                 # Apply final velocity adjustment
@@ -704,7 +715,7 @@ def main():
     parser.add_argument('--timing', '-t', type=int, default=10, help='Timing variation in ticks (default: 10)')
     parser.add_argument('--velocity', '-v', type=int, default=15, help='Velocity variation (default: 15)')
     parser.add_argument('--ghost', '-g', type=float, default=0.0, help='Ghost note probability (default: 0.0)')
-    parser.add_argument('--accent', '-a', type=float, default=0.2, help='Accent probability (default: 0.2)')
+    parser.add_argument('--accent', '-a', type=float, default=0.0, help='Accent probability (default: 0.2)')
     parser.add_argument('--shuffle', '-s', type=float, default=0.0, help='Shuffle amount, 0.0-0.5 (default: 0.0)')
     parser.add_argument('--flams', '-f', type=float, default=0.0, help='Flam probability (default: 0.0)')
     parser.add_argument('--style', type=str, default="balanced", 
