@@ -481,10 +481,10 @@ def humanize_drums(
     output_file,
     timing_variation=10,
     velocity_variation=15,
-    ghost_note_prob=0.0,
+    ghost_note_prob=0.1,
     accent_prob=0.2,
     shuffle_amount=0.0,
-    flamming_prob=0.0,
+    flamming_prob=0.05,
     drummer_style="balanced",
     drum_library="gm",
 ):
@@ -906,14 +906,14 @@ def main():
         "--ghost",
         "-g",
         type=float,
-        default=0.0,
-        help="Ghost note probability (default: 0.0)",
+        default=0.1,
+        help="Ghost note probability (default: 0.1)",
     )
     parser.add_argument(
         "--accent",
         "-a",
         type=float,
-        default=0.0,
+        default=0.2,
         help="Accent probability (default: 0.2)",
     )
     parser.add_argument(
@@ -924,7 +924,7 @@ def main():
         help="Shuffle amount, 0.0-0.5 (default: 0.0)",
     )
     parser.add_argument(
-        "--flams", "-f", type=float, default=0.0, help="Flam probability (default: 0.0)"
+        "--flams", "-f", type=float, default=0.05, help="Flam probability (default: 0.0)"
     )
     parser.add_argument(
         "--style",
