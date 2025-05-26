@@ -514,11 +514,27 @@ def humanize_drums(
     drum_library : str
         Drum library to use for MIDI mapping ("gm", "ad2", "sd3", "ez2", "ssd5")
     """
+        # Validate parameters
+    if not 0 <= ghost_note_prob <= 1:
+        raise ValueError("Ghost note probability must be between 0 and 1")
+    if not 0 <= accent_prob <= 1:
+        raise ValueError("Accent probability must be between 0 and 1")
+    if not 0 <= shuffle_amount <= 0.5:
+        raise ValueError("Shuffle amount must be between 0 and 0.5")
+    if not 0 <= flamming_prob <= 1:
+        raise ValueError("Flam probability must be between 0 and 1")
+    
     print(f"Loading MIDI file: {input_file}")
     try:
         midi_file = mido.MidiFile(input_file)
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found")
+        return
+    except mido.MidiFile.IOError as e:
+        print(f"Error: Invalid MIDI file - {str(e)}")
+        return
     except Exception as e:
-        print(f"Error loading MIDI file: {e}")
+        print(f"Unexpected error loading MIDI file: {str(e)}")
         return
 
     # Create a new MIDI file with the same settings
@@ -555,7 +571,11 @@ def humanize_drums(
     current_tempo = 500000  # Default 120 BPM (microseconds per beat)
 
     # Process each track
+    total_notes = sum(len(track) for track in midi_file.tracks)
+    processed_notes = 0
+    
     for track in midi_file.tracks:
+        print(f"\nProcessing track {midi_file.tracks.index(track) + 1}/{len(midi_file.tracks)}")
         new_track = mido.MidiTrack()
         new_midi.tracks.append(new_track)
 
