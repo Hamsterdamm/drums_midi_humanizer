@@ -807,26 +807,15 @@ def humanize_drums(
                     ghost_prob = ghost_note_prob * profile["ghost_multiplier"]
 
                     # More likely to add ghosts before backbeats
-                    if (
-                        abs(measure_position - 1.0) < 0.2
-                        or abs(measure_position - 3.0) < 0.2
-                    ):
-                        ghost_prob *= 1.5
-
+                    if abs(measure_position - 1.0) < 0.2 or abs(measure_position - 3.0) < 0.2:
+                        ghost_prob *= 1.5  # Increase probability before backbeats
+                        
                     if random.random() < ghost_prob:
-                        # Create a ghost note with lower velocity
-                        ghost_velocity = max(
-                            1, min(msg.velocity - random.randint(40, 60), 30)
-                        )
-                        # Ghost notes usually just before the main beat
-                        ghost_offset = random.randint(
-                            ticks_per_beat // 16, ticks_per_beat // 8
-                        )
-                        ghost_time = time - ghost_offset
-
-                        if ghost_time > 0:
-                            ghost_note = msg.copy(velocity=ghost_velocity)
-                            humanized_notes.append((ghost_time, ghost_note))
+                        # Create ghost note with reduced velocity
+                        ghost_velocity = int(new_velocity * 0.4)  # 40% of original velocity
+                        ghost_time = time - int(random.randint(5, 15))  # Slightly before main hit
+                        ghost_msg = msg.copy(velocity=ghost_velocity)
+                        humanized_notes.append((ghost_time, ghost_msg))
 
                 elif msg.note in TOM_NOTES and not in_fill:
                     # Occasional ghost notes on toms outside of fills
@@ -848,14 +837,10 @@ def humanize_drums(
                 # ======= FLAMS =======
                 # Add flams (quick double hits) to snares occasionally
                 if msg.note in SNARE_NOTES and random.random() < flamming_prob:
-                    # Flam is a quieter note right before the main hit
-                    flam_velocity = max(1, int(new_velocity * 0.7))
-                    flam_offset = random.randint(3, 10)  # Very close to the main hit
-                    flam_time = time - flam_offset
-
-                    if flam_time > 0:
-                        flam_note = msg.copy(velocity=flam_velocity)
-                        humanized_notes.append((flam_time, flam_note))
+                    flam_velocity = int(new_velocity * 0.7)  # 70% of main hit
+                    flam_time = time - int(random.randint(10, 20))  # Quick grace note
+                    flam_msg = msg.copy(velocity=flam_velocity)
+                    humanized_notes.append((flam_time, flam_msg))
 
                 # Add the main humanized note
                 humanized_note = (
