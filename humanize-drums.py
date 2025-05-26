@@ -221,6 +221,41 @@ drum_maps = {
 }
 
 
+# Define common drum rudiments
+drum_rudiments = {
+    "single_paradiddle": {
+        "pattern": ["R", "L", "R", "R", "L", "R", "L", "L"],  # RLRR LRLL
+        "timing_ratio": [1, 1, 1, 1, 1, 1, 1, 1],  # Even timing
+        "velocity_ratio": [1.0, 0.8, 0.9, 0.85, 1.0, 0.8, 0.9, 0.85],
+        "duration": 2,  # Duration in beats
+    },
+    "double_paradiddle": {
+        "pattern": ["R", "L", "R", "L", "R", "R", "L", "R", "L", "R", "L", "L"],  # RLRLRR LRLRLL
+        "timing_ratio": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        "velocity_ratio": [1.0, 0.85, 0.9, 0.85, 0.9, 0.95, 1.0, 0.85, 0.9, 0.85, 0.9, 0.95],
+        "duration": 3,
+    },
+    "triple_roll": {
+        "pattern": ["R", "L", "R", "L", "R", "L"],
+        "timing_ratio": [0.666, 0.666, 0.666, 0.666, 0.666, 0.666],
+        "velocity_ratio": [1.0, 0.9, 0.95, 0.9, 0.95, 1.0],
+        "duration": 1,
+    },
+    "five_stroke_roll": {
+        "pattern": ["R", "L", "R", "L", "R"],
+        "timing_ratio": [0.75, 0.75, 0.75, 0.75, 1],
+        "velocity_ratio": [0.8, 0.8, 0.85, 0.9, 1.0],
+        "duration": 1,
+    },
+    "flam_tap": {
+        "pattern": ["rR", "L", "lL", "R"],  # lowercase represents grace note
+        "timing_ratio": [1, 1, 1, 1],
+        "velocity_ratio": [1.0, 0.8, 1.0, 0.8],
+        "duration": 1,
+    },
+}
+
+
 # Group drum types for specialized handling based on selected mapping
 def get_note_groups(drum_map):
     kick_notes = []
@@ -474,6 +509,53 @@ def humanize_velocity(
     # Apply final velocity adjustment
     new_velocity = max(1, min(127, msg.velocity + int(velocity_var)))
     return new_velocity
+
+
+def apply_rudiment(
+    time,
+    msg,
+    rudiment,
+    ticks_per_beat,
+    profile,
+    SNARE_NOTES,
+    current_velocity
+):
+    """
+    Apply a drum rudiment pattern to a note.
+    Returns a list of (time, msg) tuples for the rudiment.
+    """
+    rudiment_notes = []
+    base_velocity = current_velocity
+    subdivision = ticks_per_beat / (len(rudiment["pattern"]) / rudiment["duration"])
+    
+    for i, stroke in enumerate(rudiment["pattern"]):
+        stroke_time = time + (i * subdivision * rudiment["timing_ratio"][i])
+        
+        # Handle grace notes (lowercase letters in pattern)
+        if len(stroke) == 2:  # Grace note + main note
+            # Add grace note
+            grace_velocity = int(base_velocity * rudiment["velocity_ratio"][i] * 0.6)
+            grace_time = stroke_time - 10  # 10 ticks before main note
+            grace_msg = msg.copy(velocity=grace_velocity)
+            rudiment_notes.append((grace_time, grace_msg))
+            
+            # Add main note
+            main_velocity = int(base_velocity * rudiment["velocity_ratio"][i])
+            main_msg = msg.copy(velocity=main_velocity)
+            rudiment_notes.append((stroke_time, main_msg))
+        else:
+            # Regular note
+            note_velocity = int(base_velocity * rudiment["velocity_ratio"][i])
+            note_msg = msg.copy(velocity=note_velocity)
+            rudiment_notes.append((stroke_time, note_msg))
+        
+        # Add note-off messages
+        rudiment_notes.append((
+            stroke_time + 10,
+            mido.Message('note_off', note=msg.note, velocity=0, channel=msg.channel)
+        ))
+    
+    return rudiment_notes
 
 
 def humanize_drums(
@@ -842,6 +924,49 @@ def humanize_drums(
                     flam_msg = msg.copy(velocity=flam_velocity)
                     humanized_notes.append((flam_time, flam_msg))
 
+                # ======= RUDIMENTS =======
+                # Detect and apply rudiments for snare patterns
+                if msg.note in SNARE_NOTES:
+                    # Look ahead for potential rudiment patterns
+                    next_notes = [
+                        n for t, n in messages[messages.index((time, msg))+1:]
+                        if n.type == 'note_on' and n.note in SNARE_NOTES
+                        and t - time < ticks_per_beat * 2  # Look ahead up to 2 beats
+                    ]
+                    
+                    # Check for rapid sequences that might be rudiments
+                    if len(next_notes) >= 3:
+                        interval = messages[messages.index((time, msg))+1][0] - time
+                        
+                        # Detect if this might be part of a rudiment (based on speed and regularity)
+                        if interval < ticks_per_beat / 4:  # Faster than 16th notes
+                            # Apply a rudiment based on the pattern
+                            if len(next_notes) >= 7:  # Possible paradiddle
+                                rudiment_notes = apply_rudiment(
+                                    time,
+                                    msg,
+                                    drum_rudiments["single_paradiddle"],
+                                    ticks_per_beat,
+                                    profile,
+                                    SNARE_NOTES,
+                                    new_velocity
+                                )
+                                humanized_notes.extend(rudiment_notes)
+                                continue  # Skip normal note processing
+                            
+                            elif len(next_notes) >= 5:  # Possible five stroke roll
+                                rudiment_notes = apply_rudiment(
+                                    time,
+                                    msg,
+                                    drum_rudiments["five_stroke_roll"],
+                                    ticks_per_beat,
+                                    profile,
+                                    SNARE_NOTES,
+                                    new_velocity
+                                )
+                                humanized_notes.extend(rudiment_notes)
+                                continue
+
                 # Add the main humanized note
                 humanized_note = (
                     msg.copy(velocity=new_velocity) if new_velocity > 0 else msg.copy()
@@ -944,6 +1069,17 @@ def main():
         default="gm",
         choices=["gm", "ad2", "sd3", "ez2", "ssd5"],
         help="Drums library mapping (default: gm)",
+    )
+    parser.add_argument(
+        '--rudiments',
+        action='store_true',
+        help='Enable automatic rudiment detection and application'
+    )
+    parser.add_argument(
+        '--rudiment-intensity',
+        type=float,
+        default=0.5,
+        help='Intensity of rudiment application (0.0-1.0)'
     )
 
     args = parser.parse_args()
