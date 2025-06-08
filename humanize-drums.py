@@ -221,6 +221,41 @@ drum_maps = {
 }
 
 
+# Define common drum rudiments
+drum_rudiments = {
+    "single_paradiddle": {
+        "pattern": ["R", "L", "R", "R", "L", "R", "L", "L"],  # RLRR LRLL
+        "timing_ratio": [1, 1, 1, 1, 1, 1, 1, 1],  # Even timing
+        "velocity_ratio": [1.0, 0.8, 0.9, 0.85, 1.0, 0.8, 0.9, 0.85],
+        "duration": 2,  # Duration in beats
+    },
+    "double_paradiddle": {
+        "pattern": ["R", "L", "R", "L", "R", "R", "L", "R", "L", "R", "L", "L"],  # RLRLRR LRLRLL
+        "timing_ratio": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        "velocity_ratio": [1.0, 0.85, 0.9, 0.85, 0.9, 0.95, 1.0, 0.85, 0.9, 0.85, 0.9, 0.95],
+        "duration": 3,
+    },
+    "triple_roll": {
+        "pattern": ["R", "L", "R", "L", "R", "L"],
+        "timing_ratio": [0.666, 0.666, 0.666, 0.666, 0.666, 0.666],
+        "velocity_ratio": [1.0, 0.9, 0.95, 0.9, 0.95, 1.0],
+        "duration": 1,
+    },
+    "five_stroke_roll": {
+        "pattern": ["R", "L", "R", "L", "R"],
+        "timing_ratio": [0.75, 0.75, 0.75, 0.75, 1],
+        "velocity_ratio": [0.8, 0.8, 0.85, 0.9, 1.0],
+        "duration": 1,
+    },
+    "flam_tap": {
+        "pattern": ["rR", "L", "lL", "R"],  # lowercase represents grace note
+        "timing_ratio": [1, 1, 1, 1],
+        "velocity_ratio": [1.0, 0.8, 1.0, 0.8],
+        "duration": 1,
+    },
+}
+
+
 # Group drum types for specialized handling based on selected mapping
 def get_note_groups(drum_map):
     kick_notes = []
@@ -476,6 +511,53 @@ def humanize_velocity(
     return new_velocity
 
 
+def apply_rudiment(
+    time,
+    msg,
+    rudiment,
+    ticks_per_beat,
+    profile,
+    SNARE_NOTES,
+    current_velocity
+):
+    """
+    Apply a drum rudiment pattern to a note.
+    Returns a list of (time, msg) tuples for the rudiment.
+    """
+    rudiment_notes = []
+    base_velocity = current_velocity
+    subdivision = ticks_per_beat / (len(rudiment["pattern"]) / rudiment["duration"])
+    
+    for i, stroke in enumerate(rudiment["pattern"]):
+        stroke_time = time + (i * subdivision * rudiment["timing_ratio"][i])
+        
+        # Handle grace notes (lowercase letters in pattern)
+        if len(stroke) == 2:  # Grace note + main note
+            # Add grace note
+            grace_velocity = int(base_velocity * rudiment["velocity_ratio"][i] * 0.6)
+            grace_time = stroke_time - 10  # 10 ticks before main note
+            grace_msg = msg.copy(velocity=grace_velocity)
+            rudiment_notes.append((grace_time, grace_msg))
+            
+            # Add main note
+            main_velocity = int(base_velocity * rudiment["velocity_ratio"][i])
+            main_msg = msg.copy(velocity=main_velocity)
+            rudiment_notes.append((stroke_time, main_msg))
+        else:
+            # Regular note
+            note_velocity = int(base_velocity * rudiment["velocity_ratio"][i])
+            note_msg = msg.copy(velocity=note_velocity)
+            rudiment_notes.append((stroke_time, note_msg))
+        
+        # Add note-off messages
+        rudiment_notes.append((
+            stroke_time + 10,
+            mido.Message('note_off', note=msg.note, velocity=0, channel=msg.channel)
+        ))
+    
+    return rudiment_notes
+
+
 def humanize_drums(
     input_file,
     output_file,
@@ -514,11 +596,27 @@ def humanize_drums(
     drum_library : str
         Drum library to use for MIDI mapping ("gm", "ad2", "sd3", "ez2", "ssd5")
     """
+        # Validate parameters
+    if not 0 <= ghost_note_prob <= 1:
+        raise ValueError("Ghost note probability must be between 0 and 1")
+    if not 0 <= accent_prob <= 1:
+        raise ValueError("Accent probability must be between 0 and 1")
+    if not 0 <= shuffle_amount <= 0.5:
+        raise ValueError("Shuffle amount must be between 0 and 0.5")
+    if not 0 <= flamming_prob <= 1:
+        raise ValueError("Flam probability must be between 0 and 1")
+    
     print(f"Loading MIDI file: {input_file}")
     try:
         midi_file = mido.MidiFile(input_file)
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found")
+        return
+    except mido.MidiFile.IOError as e:
+        print(f"Error: Invalid MIDI file - {str(e)}")
+        return
     except Exception as e:
-        print(f"Error loading MIDI file: {e}")
+        print(f"Unexpected error loading MIDI file: {str(e)}")
         return
 
     # Create a new MIDI file with the same settings
@@ -555,7 +653,11 @@ def humanize_drums(
     current_tempo = 500000  # Default 120 BPM (microseconds per beat)
 
     # Process each track
+    total_notes = sum(len(track) for track in midi_file.tracks)
+    processed_notes = 0
+    
     for track in midi_file.tracks:
+        print(f"\nProcessing track {midi_file.tracks.index(track) + 1}/{len(midi_file.tracks)}")
         new_track = mido.MidiTrack()
         new_midi.tracks.append(new_track)
 
@@ -787,26 +889,15 @@ def humanize_drums(
                     ghost_prob = ghost_note_prob * profile["ghost_multiplier"]
 
                     # More likely to add ghosts before backbeats
-                    if (
-                        abs(measure_position - 1.0) < 0.2
-                        or abs(measure_position - 3.0) < 0.2
-                    ):
-                        ghost_prob *= 1.5
-
+                    if abs(measure_position - 1.0) < 0.2 or abs(measure_position - 3.0) < 0.2:
+                        ghost_prob *= 1.5  # Increase probability before backbeats
+                        
                     if random.random() < ghost_prob:
-                        # Create a ghost note with lower velocity
-                        ghost_velocity = max(
-                            1, min(msg.velocity - random.randint(40, 60), 30)
-                        )
-                        # Ghost notes usually just before the main beat
-                        ghost_offset = random.randint(
-                            ticks_per_beat // 16, ticks_per_beat // 8
-                        )
-                        ghost_time = time - ghost_offset
-
-                        if ghost_time > 0:
-                            ghost_note = msg.copy(velocity=ghost_velocity)
-                            humanized_notes.append((ghost_time, ghost_note))
+                        # Create ghost note with reduced velocity
+                        ghost_velocity = int(new_velocity * 0.4)  # 40% of original velocity
+                        ghost_time = time - int(random.randint(5, 15))  # Slightly before main hit
+                        ghost_msg = msg.copy(velocity=ghost_velocity)
+                        humanized_notes.append((ghost_time, ghost_msg))
 
                 elif msg.note in TOM_NOTES and not in_fill:
                     # Occasional ghost notes on toms outside of fills
@@ -828,14 +919,53 @@ def humanize_drums(
                 # ======= FLAMS =======
                 # Add flams (quick double hits) to snares occasionally
                 if msg.note in SNARE_NOTES and random.random() < flamming_prob:
-                    # Flam is a quieter note right before the main hit
-                    flam_velocity = max(1, int(new_velocity * 0.7))
-                    flam_offset = random.randint(3, 10)  # Very close to the main hit
-                    flam_time = time - flam_offset
+                    flam_velocity = int(new_velocity * 0.7)  # 70% of main hit
+                    flam_time = time - int(random.randint(10, 20))  # Quick grace note
+                    flam_msg = msg.copy(velocity=flam_velocity)
+                    humanized_notes.append((flam_time, flam_msg))
 
-                    if flam_time > 0:
-                        flam_note = msg.copy(velocity=flam_velocity)
-                        humanized_notes.append((flam_time, flam_note))
+                # ======= RUDIMENTS =======
+                # Detect and apply rudiments for snare patterns
+                if msg.note in SNARE_NOTES:
+                    # Look ahead for potential rudiment patterns
+                    next_notes = [
+                        n for t, n in messages[messages.index((time, msg))+1:]
+                        if n.type == 'note_on' and n.note in SNARE_NOTES
+                        and t - time < ticks_per_beat * 2  # Look ahead up to 2 beats
+                    ]
+                    
+                    # Check for rapid sequences that might be rudiments
+                    if len(next_notes) >= 3:
+                        interval = messages[messages.index((time, msg))+1][0] - time
+                        
+                        # Detect if this might be part of a rudiment (based on speed and regularity)
+                        if interval < ticks_per_beat / 4:  # Faster than 16th notes
+                            # Apply a rudiment based on the pattern
+                            if len(next_notes) >= 7:  # Possible paradiddle
+                                rudiment_notes = apply_rudiment(
+                                    time,
+                                    msg,
+                                    drum_rudiments["single_paradiddle"],
+                                    ticks_per_beat,
+                                    profile,
+                                    SNARE_NOTES,
+                                    new_velocity
+                                )
+                                humanized_notes.extend(rudiment_notes)
+                                continue  # Skip normal note processing
+                            
+                            elif len(next_notes) >= 5:  # Possible five stroke roll
+                                rudiment_notes = apply_rudiment(
+                                    time,
+                                    msg,
+                                    drum_rudiments["five_stroke_roll"],
+                                    ticks_per_beat,
+                                    profile,
+                                    SNARE_NOTES,
+                                    new_velocity
+                                )
+                                humanized_notes.extend(rudiment_notes)
+                                continue
 
                 # Add the main humanized note
                 humanized_note = (
@@ -939,6 +1069,17 @@ def main():
         default="gm",
         choices=["gm", "ad2", "sd3", "ez2", "ssd5"],
         help="Drums library mapping (default: gm)",
+    )
+    parser.add_argument(
+        '--rudiments',
+        action='store_true',
+        help='Enable automatic rudiment detection and application'
+    )
+    parser.add_argument(
+        '--rudiment-intensity',
+        type=float,
+        default=0.5,
+        help='Intensity of rudiment application (0.0-1.0)'
     )
 
     args = parser.parse_args()
