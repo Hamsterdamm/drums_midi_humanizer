@@ -263,9 +263,35 @@ drum_rudiments = {
         "duration": 2,  # Duration in beats
     },
     "double_paradiddle": {
-        "pattern": ["R", "L", "R", "L", "R", "R", "L", "R", "L", "R", "L", "L"],  # RLRLRR LRLRLL
+        "pattern": [
+            "R",
+            "L",
+            "R",
+            "L",
+            "R",
+            "R",
+            "L",
+            "R",
+            "L",
+            "R",
+            "L",
+            "L",
+        ],  # RLRLRR LRLRLL
         "timing_ratio": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        "velocity_ratio": [1.0, 0.85, 0.9, 0.85, 0.9, 0.95, 1.0, 0.85, 0.9, 0.85, 0.9, 0.95],
+        "velocity_ratio": [
+            1.0,
+            0.85,
+            0.9,
+            0.85,
+            0.9,
+            0.95,
+            1.0,
+            0.85,
+            0.9,
+            0.85,
+            0.9,
+            0.95,
+        ],
         "duration": 3,
     },
     "triple_roll": {
@@ -545,13 +571,7 @@ def humanize_velocity(
 
 
 def apply_rudiment(
-    time,
-    msg,
-    rudiment,
-    ticks_per_beat,
-    profile,
-    SNARE_NOTES,
-    current_velocity
+    time, msg, rudiment, ticks_per_beat, profile, SNARE_NOTES, current_velocity
 ):
     """
     Apply a drum rudiment pattern to a note.
@@ -560,10 +580,10 @@ def apply_rudiment(
     rudiment_notes = []
     base_velocity = current_velocity
     subdivision = ticks_per_beat / (len(rudiment["pattern"]) / rudiment["duration"])
-    
+
     for i, stroke in enumerate(rudiment["pattern"]):
         stroke_time = time + (i * subdivision * rudiment["timing_ratio"][i])
-        
+
         # Handle grace notes (lowercase letters in pattern)
         if len(stroke) == 2:  # Grace note + main note
             # Add grace note
@@ -571,7 +591,7 @@ def apply_rudiment(
             grace_time = stroke_time - 10  # 10 ticks before main note
             grace_msg = msg.copy(velocity=grace_velocity)
             rudiment_notes.append((grace_time, grace_msg))
-            
+
             # Add main note
             main_velocity = int(base_velocity * rudiment["velocity_ratio"][i])
             main_msg = msg.copy(velocity=main_velocity)
@@ -581,13 +601,17 @@ def apply_rudiment(
             note_velocity = int(base_velocity * rudiment["velocity_ratio"][i])
             note_msg = msg.copy(velocity=note_velocity)
             rudiment_notes.append((stroke_time, note_msg))
-        
+
         # Add note-off messages
-        rudiment_notes.append((
-            stroke_time + 10,
-            mido.Message('note_off', note=msg.note, velocity=0, channel=msg.channel)
-        ))
-    
+        rudiment_notes.append(
+            (
+                stroke_time + 10,
+                mido.Message(
+                    "note_off", note=msg.note, velocity=0, channel=msg.channel
+                ),
+            )
+        )
+
     return rudiment_notes
 
 
@@ -630,7 +654,7 @@ def humanize_drums(
     drum_library : str
         Drum library to use for MIDI mapping ("gm", "ad2", "sd3", "ez2", "ssd5")
     """
-        # Validate parameters
+    # Validate parameters
     if not 0 <= ghost_note_prob <= 1:
         raise ValueError("Ghost note probability must be between 0 and 1")
     if not 0 <= accent_prob <= 1:
@@ -639,7 +663,7 @@ def humanize_drums(
         raise ValueError("Shuffle amount must be between 0 and 0.5")
     if not 0 <= flamming_prob <= 1:
         raise ValueError("Flam probability must be between 0 and 1")
-    
+
     print(f"Loading MIDI file: {input_file}")
     try:
         midi_file = mido.MidiFile(input_file)
@@ -689,9 +713,11 @@ def humanize_drums(
     # Process each track
     total_notes = sum(len(track) for track in midi_file.tracks)
     processed_notes = 0
-    
+
     for track in midi_file.tracks:
-        print(f"\nProcessing track {midi_file.tracks.index(track) + 1}/{len(midi_file.tracks)}")
+        print(
+            f"\nProcessing track {midi_file.tracks.index(track) + 1}/{len(midi_file.tracks)}"
+        )
         new_track = mido.MidiTrack()
         new_midi.tracks.append(new_track)
 
@@ -923,13 +949,20 @@ def humanize_drums(
                     ghost_prob = ghost_note_prob * profile["ghost_multiplier"]
 
                     # More likely to add ghosts before backbeats
-                    if abs(measure_position - 1.0) < 0.2 or abs(measure_position - 3.0) < 0.2:
+                    if (
+                        abs(measure_position - 1.0) < 0.2
+                        or abs(measure_position - 3.0) < 0.2
+                    ):
                         ghost_prob *= 1.5  # Increase probability before backbeats
-                        
+
                     if random.random() < ghost_prob:
                         # Create ghost note with reduced velocity
-                        ghost_velocity = int(new_velocity * 0.4)  # 40% of original velocity
-                        ghost_time = time - int(random.randint(5, 15))  # Slightly before main hit
+                        ghost_velocity = int(
+                            new_velocity * 0.4
+                        )  # 40% of original velocity
+                        ghost_time = time - int(
+                            random.randint(5, 15)
+                        )  # Slightly before main hit
                         ghost_msg = msg.copy(velocity=ghost_velocity)
                         humanized_notes.append((ghost_time, ghost_msg))
 
@@ -963,15 +996,17 @@ def humanize_drums(
                 if msg.note in SNARE_NOTES:
                     # Look ahead for potential rudiment patterns
                     next_notes = [
-                        n for t, n in messages[messages.index((time, msg))+1:]
-                        if n.type == 'note_on' and n.note in SNARE_NOTES
+                        n
+                        for t, n in messages[messages.index((time, msg)) + 1 :]
+                        if n.type == "note_on"
+                        and n.note in SNARE_NOTES
                         and t - time < ticks_per_beat * 2  # Look ahead up to 2 beats
                     ]
-                    
+
                     # Check for rapid sequences that might be rudiments
                     if len(next_notes) >= 3:
-                        interval = messages[messages.index((time, msg))+1][0] - time
-                        
+                        interval = messages[messages.index((time, msg)) + 1][0] - time
+
                         # Detect if this might be part of a rudiment (based on speed and regularity)
                         if interval < ticks_per_beat / 4:  # Faster than 16th notes
                             # Apply a rudiment based on the pattern
@@ -983,11 +1018,11 @@ def humanize_drums(
                                     ticks_per_beat,
                                     profile,
                                     SNARE_NOTES,
-                                    new_velocity
+                                    new_velocity,
                                 )
                                 humanized_notes.extend(rudiment_notes)
                                 continue  # Skip normal note processing
-                            
+
                             elif len(next_notes) >= 5:  # Possible five stroke roll
                                 rudiment_notes = apply_rudiment(
                                     time,
@@ -996,7 +1031,7 @@ def humanize_drums(
                                     ticks_per_beat,
                                     profile,
                                     SNARE_NOTES,
-                                    new_velocity
+                                    new_velocity,
                                 )
                                 humanized_notes.extend(rudiment_notes)
                                 continue
@@ -1043,10 +1078,11 @@ def humanize_drums(
 
     # Create visualization if requested
     if visualize:
-        viz_output = str(Path(output_file).with_suffix('.png'))
+        viz_output = str(Path(output_file).with_suffix(".png"))
         try:
             import matplotlib.pyplot as plt
             import numpy as np
+
             if not create_drum_visualization(messages, humanized_notes, viz_output):
                 print("Make sure matplotlib is installed: pip install matplotlib")
         except ImportError:
@@ -1064,7 +1100,7 @@ def create_visualization(original_messages, humanized_messages, output_path):
 
 def create_drum_visualization(original_messages, humanized_messages, output_png):
     """Create a detailed visualization comparing original and humanized MIDI drum patterns.
-    
+
     Features:
     - Color-coded notes by drum type (kicks, snares, hi-hats, toms, cymbals)
     - Velocity shown through note size
@@ -1074,77 +1110,111 @@ def create_drum_visualization(original_messages, humanized_messages, output_png)
     """
     try:
         print(f"\nGenerating visualization: {output_png}")
-        
-        plt.style.use('dark_background')
+
+        plt.style.use("dark_background")
         fig = plt.figure(figsize=(15, 12))
         gs = plt.GridSpec(3, 1, height_ratios=[5, 5, 1], hspace=0.3)
         ax1 = plt.subplot(gs[0])
         ax2 = plt.subplot(gs[1])
         ax_legend = plt.subplot(gs[2])
-        
-        fig.suptitle('MIDI Drum Pattern Analysis\nOriginal vs. Humanized Pattern', fontsize=16, y=1.02)
-        
-        def plot_notes(ax, messages, alpha=1.0, title=''):
-            times = [t for t, m in messages if m.type == 'note_on' and m.velocity > 0]
-            notes = [m.note for t, m in messages if m.type == 'note_on' and m.velocity > 0]
-            velocities = [m.velocity * 3 for t, m in messages if m.type == 'note_on' and m.velocity > 0]
-            
+
+        fig.suptitle(
+            "MIDI Drum Pattern Analysis\nOriginal vs. Humanized Pattern",
+            fontsize=16,
+            y=1.02,
+        )
+
+        def plot_notes(ax, messages, alpha=1.0, title=""):
+            times = [t for t, m in messages if m.type == "note_on" and m.velocity > 0]
+            notes = [
+                m.note for t, m in messages if m.type == "note_on" and m.velocity > 0
+            ]
+            velocities = [
+                m.velocity * 3
+                for t, m in messages
+                if m.type == "note_on" and m.velocity > 0
+            ]
+
             if not times:
                 return
-            
+
             # Color coding and categorization
             drum_categories = {
-                'Kicks': {'notes': (35, 36), 'color': '#FF4444'},
-                'Snares': {'notes': (37, 38, 39, 40), 'color': '#44FF44'},
-                'Hi-hats': {'notes': (42, 44, 46), 'color': '#4444FF'},
-                'Toms': {'notes': (41, 43, 45, 47, 48, 50), 'color': '#FF44FF'},
-                'Cymbals': {'notes': (49, 51, 52, 53, 55, 57, 59), 'color': '#FFFF44'}
+                "Kicks": {"notes": (35, 36), "color": "#FF4444"},
+                "Snares": {"notes": (37, 38, 39, 40), "color": "#44FF44"},
+                "Hi-hats": {"notes": (42, 44, 46), "color": "#4444FF"},
+                "Toms": {"notes": (41, 43, 45, 47, 48, 50), "color": "#FF44FF"},
+                "Cymbals": {"notes": (49, 51, 52, 53, 55, 57, 59), "color": "#FFFF44"},
             }
-            
+
             # Plot each category separately for legend
             for cat_name, cat_info in drum_categories.items():
                 cat_times = []
                 cat_notes = []
                 cat_vels = []
-                
+
                 for t, n, v in zip(times, notes, velocities):
-                    if any(n == note for note in cat_info['notes']):
+                    if any(n == note for note in cat_info["notes"]):
                         cat_times.append(t)
                         cat_notes.append(n)
                         cat_vels.append(v)
-                
+
                 if cat_times:
-                    ax.scatter(cat_times, cat_notes, alpha=alpha, s=cat_vels, 
-                             c=cat_info['color'], label=cat_name)
-            
+                    ax.scatter(
+                        cat_times,
+                        cat_notes,
+                        alpha=alpha,
+                        s=cat_vels,
+                        c=cat_info["color"],
+                        label=cat_name,
+                    )
+
             # Grid lines for beats
             if times:
                 ticks_per_beat = 480  # Standard MIDI resolution
                 max_time = max(times)
                 beat_lines = np.arange(0, max_time + ticks_per_beat, ticks_per_beat)
-                ax.vlines(beat_lines, ax.get_ylim()[0], ax.get_ylim()[1], 
-                         color='gray', alpha=0.2, linestyle='--')
-            
+                ax.vlines(
+                    beat_lines,
+                    ax.get_ylim()[0],
+                    ax.get_ylim()[1],
+                    color="gray",
+                    alpha=0.2,
+                    linestyle="--",
+                )
+
             ax.set_title(title)
-            ax.set_ylabel('Drum Type')
+            ax.set_ylabel("Drum Type")
             ax.grid(True, alpha=0.2)
-            
+
             # Enhanced note labels
             note_names = {
-                35: "Acoustic Bass Drum", 36: "Bass Drum 1",
-                38: "Acoustic Snare", 40: "Electric Snare",
-                42: "Closed Hi-Hat", 44: "Pedal Hi-Hat", 46: "Open Hi-Hat",
-                41: "Low Floor Tom", 43: "High Floor Tom", 45: "Low Tom",
-                47: "Low-Mid Tom", 48: "Hi-Mid Tom", 50: "High Tom",
-                49: "Crash Cymbal 1", 51: "Ride Cymbal 1", 52: "Chinese Cymbal",
-                53: "Ride Bell", 55: "Splash Cymbal", 57: "Crash Cymbal 2", 
-                59: "Ride Cymbal 2"
+                35: "Acoustic Bass Drum",
+                36: "Bass Drum 1",
+                38: "Acoustic Snare",
+                40: "Electric Snare",
+                42: "Closed Hi-Hat",
+                44: "Pedal Hi-Hat",
+                46: "Open Hi-Hat",
+                41: "Low Floor Tom",
+                43: "High Floor Tom",
+                45: "Low Tom",
+                47: "Low-Mid Tom",
+                48: "Hi-Mid Tom",
+                50: "High Tom",
+                49: "Crash Cymbal 1",
+                51: "Ride Cymbal 1",
+                52: "Chinese Cymbal",
+                53: "Ride Bell",
+                55: "Splash Cymbal",
+                57: "Crash Cymbal 2",
+                59: "Ride Cymbal 2",
             }
-            
+
             unique_notes = sorted(set(notes)) if notes else []
             ax.set_yticks(unique_notes)
             ax.set_yticklabels([note_names.get(n, f"Note {n}") for n in unique_notes])
-              # Add beat numbers on x-axis
+            # Add beat numbers on x-axis
             if times:
                 max_time = max(times)
                 ticks_per_beat = 480  # Standard MIDI resolution
@@ -1152,14 +1222,14 @@ def create_drum_visualization(original_messages, humanized_messages, output_png)
                 tick_positions = [i * ticks_per_beat for i in range(n_beats + 1)]
                 ax.set_xticks(tick_positions)
                 ax.set_xticklabels([str(i) for i in range(n_beats + 1)])
-                ax.set_xlabel('Beats')
+                ax.set_xlabel("Beats")
 
         # Plot original and humanized patterns
-        plot_notes(ax1, original_messages, alpha=0.8, title='Original Pattern')
-        plot_notes(ax2, humanized_messages, alpha=0.8, title='Humanized Pattern')
-        
+        plot_notes(ax1, original_messages, alpha=0.8, title="Original Pattern")
+        plot_notes(ax2, humanized_messages, alpha=0.8, title="Humanized Pattern")
+
         # Remove legend axes and just use it for shared legend
-        ax_legend.axis('off')
+        ax_legend.axis("off")
         handles = []
         labels = []
         for ax in [ax1, ax2]:
@@ -1168,15 +1238,21 @@ def create_drum_visualization(original_messages, humanized_messages, output_png)
                 if li not in labels:
                     handles.append(hi)
                     labels.append(li)
-        
-        ax_legend.legend(handles, labels, loc='center', ncol=5, 
-                        bbox_to_anchor=(0.5, 0.5), fontsize=10)
-        
-        plt.savefig(output_png, dpi=300, bbox_inches='tight')
+
+        ax_legend.legend(
+            handles,
+            labels,
+            loc="center",
+            ncol=5,
+            bbox_to_anchor=(0.5, 0.5),
+            fontsize=10,
+        )
+
+        plt.savefig(output_png, dpi=300, bbox_inches="tight")
         plt.close()
         print(f"Visualization saved to: {output_png}")
         return True
-        
+
     except Exception as e:
         print(f"Error creating visualization: {str(e)}")
         print(f"Error type: {e.__class__.__name__}")
@@ -1229,7 +1305,11 @@ def main():
         help="Shuffle amount, 0.0-0.5 (default: 0.0)",
     )
     parser.add_argument(
-        "--flams", "-f", type=float, default=0.05, help="Flam probability (default: 0.0)"
+        "--flams",
+        "-f",
+        type=float,
+        default=0.05,
+        help="Flam probability (default: 0.0)",
     )
     parser.add_argument(
         "--style",
@@ -1246,20 +1326,20 @@ def main():
         help="Drums library mapping (default: gm)",
     )
     parser.add_argument(
-        '--rudiments',
-        action='store_true',
-        help='Enable automatic rudiment detection and application'
+        "--rudiments",
+        action="store_true",
+        help="Enable automatic rudiment detection and application",
     )
     parser.add_argument(
-        '--rudiment-intensity',
+        "--rudiment-intensity",
         type=float,
         default=0.5,
-        help='Intensity of rudiment application (0.0-1.0)'
+        help="Intensity of rudiment application (0.0-1.0)",
     )
     parser.add_argument(
-        '--visualize',
-        action='store_true',
-        help='Generate visualization comparing original and humanized MIDI'
+        "--visualize",
+        action="store_true",
+        help="Generate visualization comparing original and humanized MIDI",
     )
 
     args = parser.parse_args()
@@ -1267,7 +1347,7 @@ def main():
     # Set default output filename if not provided
     if not args.output:
         input_path = Path(args.input_file)
-        args.output = str(input_path.with_stem(f"{input_path.stem}_humanized")) 
+        args.output = str(input_path.with_stem(f"{input_path.stem}_humanized"))
 
     humanize_drums(
         args.input_file,
