@@ -1,0 +1,1 @@
+"""Core humanization functionality module."""
