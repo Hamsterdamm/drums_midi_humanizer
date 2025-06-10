@@ -4,6 +4,10 @@ import argparse
 import numpy as np
 from pathlib import Path
 from collections import defaultdict
+import matplotlib.pyplot as plt
+import numpy as np
+from typing import List, Tuple, Dict
+import mido
 
 
 # Set drummer profile characteristics
@@ -598,6 +602,7 @@ def humanize_drums(
     flamming_prob=0.05,
     drummer_style="balanced",
     drum_library="gm",
+    visualize=False,
 ):
     """
     Add realistic human feel to a MIDI drum track based on drumming principles.
@@ -1036,6 +1041,147 @@ def humanize_drums(
     new_midi.save(output_file)
     print("Done! Applied drummer style:", drummer_style)
 
+    # Create visualization if requested
+    if visualize:
+        viz_output = str(Path(output_file).with_suffix('.png'))
+        try:
+            import matplotlib.pyplot as plt
+            import numpy as np
+            if not create_drum_visualization(messages, humanized_notes, viz_output):
+                print("Make sure matplotlib is installed: pip install matplotlib")
+        except ImportError:
+            print("Could not create visualization - matplotlib not installed")
+            print("Install matplotlib with: pip install matplotlib")
+
+
+def create_visualization(original_messages, humanized_messages, output_path):
+    """Create a simple visualization comparing original and humanized MIDI data.
+    This is a legacy function kept for backwards compatibility.
+    Use create_drum_visualization for new code.
+    """
+    return create_drum_visualization(original_messages, humanized_messages, output_path)
+
+
+def create_drum_visualization(original_messages, humanized_messages, output_png):
+    """Create a detailed visualization comparing original and humanized MIDI drum patterns.
+    
+    Features:
+    - Color-coded notes by drum type (kicks, snares, hi-hats, toms, cymbals)
+    - Velocity shown through note size
+    - Grid lines aligned with beats
+    - Comprehensive drum labels
+    - Time axis in both ticks and beats
+    """
+    try:
+        print(f"\nGenerating visualization: {output_png}")
+        
+        plt.style.use('dark_background')
+        fig = plt.figure(figsize=(15, 12))
+        gs = plt.GridSpec(3, 1, height_ratios=[5, 5, 1], hspace=0.3)
+        ax1 = plt.subplot(gs[0])
+        ax2 = plt.subplot(gs[1])
+        ax_legend = plt.subplot(gs[2])
+        
+        fig.suptitle('MIDI Drum Pattern Analysis\nOriginal vs. Humanized Pattern', fontsize=16, y=1.02)
+        
+        def plot_notes(ax, messages, alpha=1.0, title=''):
+            times = [t for t, m in messages if m.type == 'note_on' and m.velocity > 0]
+            notes = [m.note for t, m in messages if m.type == 'note_on' and m.velocity > 0]
+            velocities = [m.velocity * 3 for t, m in messages if m.type == 'note_on' and m.velocity > 0]
+            
+            if not times:
+                return
+            
+            # Color coding and categorization
+            drum_categories = {
+                'Kicks': {'notes': (35, 36), 'color': '#FF4444'},
+                'Snares': {'notes': (37, 38, 39, 40), 'color': '#44FF44'},
+                'Hi-hats': {'notes': (42, 44, 46), 'color': '#4444FF'},
+                'Toms': {'notes': (41, 43, 45, 47, 48, 50), 'color': '#FF44FF'},
+                'Cymbals': {'notes': (49, 51, 52, 53, 55, 57, 59), 'color': '#FFFF44'}
+            }
+            
+            # Plot each category separately for legend
+            for cat_name, cat_info in drum_categories.items():
+                cat_times = []
+                cat_notes = []
+                cat_vels = []
+                
+                for t, n, v in zip(times, notes, velocities):
+                    if any(n == note for note in cat_info['notes']):
+                        cat_times.append(t)
+                        cat_notes.append(n)
+                        cat_vels.append(v)
+                
+                if cat_times:
+                    ax.scatter(cat_times, cat_notes, alpha=alpha, s=cat_vels, 
+                             c=cat_info['color'], label=cat_name)
+            
+            # Grid lines for beats
+            if times:
+                ticks_per_beat = 480  # Standard MIDI resolution
+                max_time = max(times)
+                beat_lines = np.arange(0, max_time + ticks_per_beat, ticks_per_beat)
+                ax.vlines(beat_lines, ax.get_ylim()[0], ax.get_ylim()[1], 
+                         color='gray', alpha=0.2, linestyle='--')
+            
+            ax.set_title(title)
+            ax.set_ylabel('Drum Type')
+            ax.grid(True, alpha=0.2)
+            
+            # Enhanced note labels
+            note_names = {
+                35: "Acoustic Bass Drum", 36: "Bass Drum 1",
+                38: "Acoustic Snare", 40: "Electric Snare",
+                42: "Closed Hi-Hat", 44: "Pedal Hi-Hat", 46: "Open Hi-Hat",
+                41: "Low Floor Tom", 43: "High Floor Tom", 45: "Low Tom",
+                47: "Low-Mid Tom", 48: "Hi-Mid Tom", 50: "High Tom",
+                49: "Crash Cymbal 1", 51: "Ride Cymbal 1", 52: "Chinese Cymbal",
+                53: "Ride Bell", 55: "Splash Cymbal", 57: "Crash Cymbal 2", 
+                59: "Ride Cymbal 2"
+            }
+            
+            unique_notes = sorted(set(notes)) if notes else []
+            ax.set_yticks(unique_notes)
+            ax.set_yticklabels([note_names.get(n, f"Note {n}") for n in unique_notes])
+              # Add beat numbers on x-axis
+            if times:
+                max_time = max(times)
+                ticks_per_beat = 480  # Standard MIDI resolution
+                n_beats = int(max_time / ticks_per_beat) + 1
+                tick_positions = [i * ticks_per_beat for i in range(n_beats + 1)]
+                ax.set_xticks(tick_positions)
+                ax.set_xticklabels([str(i) for i in range(n_beats + 1)])
+                ax.set_xlabel('Beats')
+
+        # Plot original and humanized patterns
+        plot_notes(ax1, original_messages, alpha=0.8, title='Original Pattern')
+        plot_notes(ax2, humanized_messages, alpha=0.8, title='Humanized Pattern')
+        
+        # Remove legend axes and just use it for shared legend
+        ax_legend.axis('off')
+        handles = []
+        labels = []
+        for ax in [ax1, ax2]:
+            h, l = ax.get_legend_handles_labels()
+            for hi, li in zip(h, l):
+                if li not in labels:
+                    handles.append(hi)
+                    labels.append(li)
+        
+        ax_legend.legend(handles, labels, loc='center', ncol=5, 
+                        bbox_to_anchor=(0.5, 0.5), fontsize=10)
+        
+        plt.savefig(output_png, dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Visualization saved to: {output_png}")
+        return True
+        
+    except Exception as e:
+        print(f"Error creating visualization: {str(e)}")
+        print(f"Error type: {e.__class__.__name__}")
+        return False
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -1089,14 +1235,14 @@ def main():
         "--style",
         type=str,
         default="balanced",
-        choices=["balanced", "jazzy", "rock", "precise", "loose", "modern_metal"],  # Added modern_metal
+        choices=["balanced", "jazzy", "rock", "precise", "loose", "modern_metal"],
         help="Drummer style profile (default: balanced)",
     )
     parser.add_argument(
         "--library",
         type=str,
         default="gm",
-        choices=["gm", "ad2", "sd3", "ez2", "ssd5", "mtpk2"],  # Added mtpk2
+        choices=["gm", "ad2", "sd3", "ez2", "ssd5", "mtpk2"],
         help="Drums library mapping (default: gm)",
     )
     parser.add_argument(
@@ -1110,13 +1256,18 @@ def main():
         default=0.5,
         help='Intensity of rudiment application (0.0-1.0)'
     )
+    parser.add_argument(
+        '--visualize',
+        action='store_true',
+        help='Generate visualization comparing original and humanized MIDI'
+    )
 
     args = parser.parse_args()
 
     # Set default output filename if not provided
     if not args.output:
         input_path = Path(args.input_file)
-        args.output = str(input_path.with_stem(f"{input_path.stem}_humanized"))
+        args.output = str(input_path.with_stem(f"{input_path.stem}_humanized")) 
 
     humanize_drums(
         args.input_file,
@@ -1129,6 +1280,7 @@ def main():
         flamming_prob=args.flams,
         drummer_style=args.style,
         drum_library=args.library,
+        visualize=args.visualize,
     )
 
 
