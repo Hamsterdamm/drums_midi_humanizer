@@ -211,6 +211,25 @@ SSD5_DRUM_MAP = {
     59: "Ride Edge",
 }
 
+# MT Power Drum Kit 2 Mapping
+MTPK2_DRUM_MAP = {
+    36: "Kick",
+    38: "Snare Center",
+    40: "Snare Rimshot",
+    37: "Snare Sidestick",
+    42: "HH Closed",
+    44: "HH Pedal",
+    46: "HH Open",
+    41: "Tom Low",
+    43: "Tom Mid",
+    45: "Tom High",
+    49: "Crash 1",
+    57: "Crash 2",
+    51: "Ride Bow",
+    53: "Ride Bell",
+    59: "Ride Edge",
+}
+
 # Select the appropriate drum map based on the library
 drum_maps = {
     "gm": GM_DRUM_MAP,
@@ -218,6 +237,7 @@ drum_maps = {
     "sd3": SD3_DRUM_MAP,
     "ez2": EZ2_DRUM_MAP,
     "ssd5": SSD5_DRUM_MAP,
+    "mtpk2": MTPK2_DRUM_MAP,
 }
 
 
@@ -997,8 +1017,8 @@ def humanize_drums(
         # Convert back to relative timing
         last_time = 0
         for abs_time, msg in humanized_notes:
-            # Calculate relative time
-            msg_copy = msg.copy(time=abs_time - last_time)
+            # Calculate relative time and ensure it's an integer
+            msg_copy = msg.copy(time=int(abs_time - last_time))  # Convert to int
             new_track.append(msg_copy)
             last_time = abs_time
 
@@ -1067,7 +1087,7 @@ def main():
         "--library",
         type=str,
         default="gm",
-        choices=["gm", "ad2", "sd3", "ez2", "ssd5"],
+        choices=["gm", "ad2", "sd3", "ez2", "ssd5", "mtpk2"],  # Added mtpk2
         help="Drums library mapping (default: gm)",
     )
     parser.add_argument(
