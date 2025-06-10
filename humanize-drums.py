@@ -53,6 +53,15 @@ drummer_profiles = {
         "rushing_factor": 0.1,  # Slight tendency to push
         "groove_consistency": 0.5,  # Inconsistent groove
     },
+    "modern_metal": {
+        "timing_bias": 1,  # Slightly ahead for aggressive feel
+        "velocity_emphasis": 1.5,  # Strong dynamic emphasis
+        "ghost_multiplier": 0.3,  # Minimal ghost notes
+        "kick_timing_tightness": 1.8,  # Very tight kick timing for blast beats and doubles
+        "hihat_variation": 0.4,  # Minimal hi-hat variation for precision
+        "rushing_factor": 0.15,  # Slight tendency to push forward
+        "groove_consistency": 0.95,  # Very consistent and mechanical
+    },
 }
 
 
@@ -1080,7 +1089,7 @@ def main():
         "--style",
         type=str,
         default="balanced",
-        choices=["balanced", "jazzy", "rock", "precise", "loose"],
+        choices=["balanced", "jazzy", "rock", "precise", "loose", "modern_metal"],  # Added modern_metal
         help="Drummer style profile (default: balanced)",
     )
     parser.add_argument(
