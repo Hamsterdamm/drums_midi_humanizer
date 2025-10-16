@@ -87,75 +87,43 @@ class DrumHumanizer:
         for track in midi_file.tracks:
             print(f"\nProcessing track {midi_file.tracks.index(track) + 1}/{len(midi_file.tracks)}")
             
-            # Group notes by absolute time to find patterns
-            notes_by_time = defaultdict(list)
             absolute_time = 0
-            for msg in track:
-                absolute_time += msg.time
-                if msg.type == 'note_on' and msg.velocity > 0:
-                    notes_by_time[absolute_time].append(msg.note)
+            # This list will hold message objects with their absolute time
+            events_with_absolute_time = []
 
-            # Process track with absolute timing
-            absolute_time = 0
-            new_track = mido.MidiTrack()
-            new_track.append(mido.MetaMessage('track_name', name='Humanized Drums', time=0))
-            
-            humanized_notes = []
-            
-            # Process MIDI messages, separating notes from other message types
+            # First pass: Apply humanization and store events with their new absolute times
             for msg in track:
                 absolute_time += msg.time
                 
                 if msg.type == 'note_on' and msg.velocity > 0:
-                    # Calculate measure position for this note
                     measure_pos = self._get_measure_position(absolute_time)
-                    
-                    # Store original message for visualization
                     original_messages.append((absolute_time, msg.note, msg.velocity))
                     
-                    # Apply humanization
                     new_time = self._apply_timing_variation(absolute_time, msg.note)
                     new_velocity = self._apply_velocity_variation(msg.velocity, msg.note, measure_pos)
                     
-                    # Add flams for snare notes
-                    if (msg.note in self.SNARE_NOTES and 
-                        random.random() < self.config.flamming_prob):
-                        flam_time = new_time - int(self.ticks_per_beat / 12)
-                        flam_velocity = int(new_velocity * 0.7)
-                        humanized_notes.append((flam_time, msg.note, flam_velocity))
-                        humanized_messages.append((flam_time, msg.note, flam_velocity))
-                    
                     # Add humanized note
-                    humanized_notes.append((new_time, msg.note, new_velocity))
+                    events_with_absolute_time.append({'time': new_time, 'msg': mido.Message('note_on', note=msg.note, velocity=new_velocity)})
+                    # Add corresponding note_off. Using a small duration for drum hits.
+                    events_with_absolute_time.append({'time': new_time + 1, 'msg': mido.Message('note_off', note=msg.note, velocity=0)})
+
                     humanized_messages.append((new_time, msg.note, new_velocity))
+                
+                elif msg.type != 'note_off': # Keep all other messages, discard original note_offs
+                    events_with_absolute_time.append({'time': absolute_time, 'msg': msg})
 
-                elif msg.type not in ['note_on', 'note_off']:
-                    # Pass through non-note messages with original timing
-                    new_track.append(msg)
+            # Sort all events by their absolute time
+            events_with_absolute_time.sort(key=lambda e: e['time'])
 
-            # Detect and apply drum rudiments to the collected notes
-            if self.profile.rudiment_sensitivity > 0.5:
-                humanized_notes = self._detect_and_apply_rudiments(humanized_notes)
-
-            # Sort notes by time and create messages with proper delta times
-            humanized_notes.sort(key=lambda x: x[0])
-            last_time = sum(m.time for m in new_track)
-            
-            for time, note, velocity in humanized_notes:
-                delta_time = time - last_time
-                new_track.append(
-                    mido.Message('note_on', 
-                               note=note,
-                               velocity=velocity,
-                               time=max(0, delta_time))
-                )
-                new_track.append(
-                    mido.Message('note_off',
-                               note=note,
-                               velocity=0,
-                               time=1) # 1-tick duration for drum hits
-                )
-                last_time = time + 1
+            # Second pass: Create the new track by calculating correct delta times
+            new_track = mido.MidiTrack()
+            last_time = 0
+            for event in events_with_absolute_time:
+                current_time = event['time']
+                delta_time = current_time - last_time
+                event['msg'].time = max(0, int(delta_time))
+                new_track.append(event['msg'])
+                last_time = current_time
 
             humanized_midi.tracks.append(new_track)
 
