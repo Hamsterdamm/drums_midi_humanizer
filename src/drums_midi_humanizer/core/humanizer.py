@@ -101,57 +101,46 @@ class DrumHumanizer:
             new_track.append(mido.MetaMessage('track_name', name='Humanized Drums', time=0))
             
             humanized_notes = []
-            in_fill = False
-            pattern_counts = defaultdict(int)
-            current_pattern = []
-            is_pattern_point = False
-            pattern_key = None
-            last_note_time = 0
             
-            # Process MIDI messages
+            # Process MIDI messages, separating notes from other message types
             for msg in track:
                 absolute_time += msg.time
                 
-                if not msg.type == 'note_on':
+                if msg.type == 'note_on' and msg.velocity > 0:
+                    # Calculate measure position for this note
+                    measure_pos = self._get_measure_position(absolute_time)
+                    
+                    # Store original message for visualization
+                    original_messages.append((absolute_time, msg.note, msg.velocity))
+                    
+                    # Apply humanization
+                    new_time = self._apply_timing_variation(absolute_time, msg.note)
+                    new_velocity = self._apply_velocity_variation(msg.velocity, msg.note, measure_pos)
+                    
+                    # Add flams for snare notes
+                    if (msg.note in self.SNARE_NOTES and 
+                        random.random() < self.config.flamming_prob):
+                        flam_time = new_time - int(self.ticks_per_beat / 12)
+                        flam_velocity = int(new_velocity * 0.7)
+                        humanized_notes.append((flam_time, msg.note, flam_velocity))
+                        humanized_messages.append((flam_time, msg.note, flam_velocity))
+                    
+                    # Add humanized note
+                    humanized_notes.append((new_time, msg.note, new_velocity))
+                    humanized_messages.append((new_time, msg.note, new_velocity))
+
+                elif msg.type not in ['note_on', 'note_off']:
                     # Pass through non-note messages with original timing
                     new_track.append(msg)
-                    continue
-                    
-                if msg.velocity == 0:  # Note-off
-                    new_track.append(msg)
-                    continue
-                    
-                # Calculate measure position for this note
-                measure_pos = self._get_measure_position(absolute_time)
-                
-                # Store original message
-                original_messages.append((absolute_time, msg.note, msg.velocity))
-                
-                # Detect fill sections
-                if msg.note in self.TOM_NOTES:
-                    current_toms = sum(1 for n in notes_by_time[absolute_time] if n in self.TOM_NOTES)
-                    in_fill = current_toms > 1
-                
-                # Apply humanization
-                new_time = self._apply_timing_variation(absolute_time, msg.note)
-                new_velocity = self._apply_velocity_variation(msg.velocity, msg.note, measure_pos)
-                
-                # Add flams for snare notes
-                if (msg.note in self.SNARE_NOTES and 
-                    random.random() < self.config.flamming_prob):
-                    flam_time = new_time - int(self.ticks_per_beat / 12)
-                    flam_velocity = int(new_velocity * 0.7)
-                    humanized_notes.append((flam_time, msg.note, flam_velocity))
-                    humanized_messages.append((flam_time, msg.note, flam_velocity))
-                
-                # Add humanized note
-                humanized_notes.append((new_time, msg.note, new_velocity))
-                humanized_messages.append((new_time, msg.note, new_velocity))
-                last_note_time = new_time
+
+            # Detect and apply drum rudiments to the collected notes
+            if self.profile.rudiment_sensitivity > 0.5:
+                humanized_notes = self._detect_and_apply_rudiments(humanized_notes)
 
             # Sort notes by time and create messages with proper delta times
             humanized_notes.sort(key=lambda x: x[0])
-            last_time = 0
+            last_time = sum(m.time for m in new_track)
+            
             for time, note, velocity in humanized_notes:
                 delta_time = time - last_time
                 new_track.append(
@@ -164,27 +153,9 @@ class DrumHumanizer:
                     mido.Message('note_off',
                                note=note,
                                velocity=0,
-                               time=1)
+                               time=1) # 1-tick duration for drum hits
                 )
                 last_time = time + 1
-
-            # Detect and apply drum rudiments
-            if self.profile.rudiment_sensitivity > 0.5:
-                rudiment_notes = self._detect_and_apply_rudiments(humanized_notes)
-                for time, note, velocity in rudiment_notes:
-                    new_track.append(
-                        mido.Message('note_on', 
-                                   note=note,
-                                   velocity=velocity,
-                                   time=max(0, time - last_time))
-                    )
-                    new_track.append(
-                        mido.Message('note_off',
-                                   note=note,
-                                   velocity=0,
-                                   time=1)
-                    )
-                    last_time = time + 1
 
             humanized_midi.tracks.append(new_track)
 
