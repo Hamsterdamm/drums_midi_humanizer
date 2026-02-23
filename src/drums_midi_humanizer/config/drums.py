@@ -1,11 +1,29 @@
-"""Configuration for drum maps and drummer profiles."""
+"""Configuration for drum maps and drummer profiles.
+
+This module defines the data structures and constants used to configure the
+drum humanizer. It includes:
+- Drum mappings for various popular drum libraries (GM, Addictive Drums, etc.).
+- Drummer profiles that define different playing styles (Jazz, Rock, Metal, etc.).
+- Rudiment definitions for pattern detection.
+"""
 
 from dataclasses import dataclass
 from typing import Dict, Any, Set, Tuple, List
 
 @dataclass
 class DrummerProfile:
-    """Profile defining a drummer's playing characteristics."""
+    """Profile defining a drummer's playing characteristics.
+
+    Attributes:
+        timing_bias (float): Base timing offset in ticks (positive = late/lazy, negative = early/rushed).
+        velocity_emphasis (float): Multiplier for velocity dynamics (1.0 = standard, >1.0 = more dynamic).
+        ghost_multiplier (float): Velocity multiplier for ghost notes (0.0-1.0).
+        kick_timing_tightness (float): How tight the kick drum is to the grid (higher = tighter).
+        hihat_variation (float): Amount of timing variation for hi-hats.
+        rushing_factor (float): Tendency to rush (positive) or drag (negative) tempo.
+        groove_consistency (float): How consistent the timing variations are (0.0-1.0).
+        rudiment_sensitivity (float): Probability threshold for applying rudiment logic (0.0-1.0).
+    """
     timing_bias: float
     velocity_emphasis: float
     ghost_multiplier: float
@@ -17,7 +35,15 @@ class DrummerProfile:
 
 @dataclass
 class DrumMap:
-    """Mapping of MIDI notes to drum types."""
+    """Mapping of MIDI notes to drum types.
+
+    Attributes:
+        kick_notes (set[int]): MIDI note numbers for kick drums.
+        snare_notes (set[int]): MIDI note numbers for snare drums.
+        hihat_notes (set[int]): MIDI note numbers for hi-hats (open, closed, pedal).
+        tom_notes (set[int]): MIDI note numbers for toms.
+        cymbal_notes (set[int]): MIDI note numbers for cymbals (crash, ride, splash, china).
+    """
     kick_notes: set[int]
     snare_notes: set[int]
     hihat_notes: set[int]
@@ -25,10 +51,11 @@ class DrumMap:
     cymbal_notes: set[int]
 
     def get_note_groups(self) -> Tuple[Set[int], Set[int], Set[int], Set[int], Set[int]]:
-        """Get all note groups.
+        """Get all note groups as a tuple of sets.
         
         Returns:
-            Tuple of (kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes)
+            Tuple[Set[int], ...]: A tuple containing sets of note numbers for:
+                (kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes).
         """
         return (
             self.kick_notes,
@@ -38,7 +65,8 @@ class DrumMap:
             self.cymbal_notes
         )
 
-# Drum maps for different libraries
+# Drum maps for different libraries.
+# Keys represent the library identifier used in the CLI.
 DRUM_MAPS = {
     "gm": DrumMap(  # General MIDI drum map
         kick_notes={35, 36},  # Acoustic Bass Drum, Bass Drum 1
@@ -84,7 +112,8 @@ DRUM_MAPS = {
     )
 }
 
-# Drummer style profiles
+# Drummer style profiles.
+# Keys represent the style name used in the CLI.
 DRUMMER_PROFILES: Dict[str, Dict[str, float]] = {
     "balanced": {
         "timing_bias": 0,  # Neutral timing
@@ -148,7 +177,12 @@ DRUMMER_PROFILES: Dict[str, Dict[str, float]] = {
     },
 }
 
-# Define common drum rudiments
+# Define common drum rudiments for pattern detection.
+# Each rudiment contains:
+#   - pattern: Hand sticking pattern (R/L).
+#   - timing_ratio: Relative timing of each note in the pattern.
+#   - velocity_ratio: Relative velocity emphasis for each note.
+#   - duration: Total duration of the pattern in beats.
 DRUM_RUDIMENTS = {
     "single_paradiddle": {
         "pattern": ["R", "L", "R", "R", "L", "R", "L", "L"],  # RLRR LRLL
@@ -183,13 +217,13 @@ DRUM_RUDIMENTS = {
 }
 
 def get_drum_map(library: str = "gm") -> DrumMap:
-    """Get the drum map for a specific library.
+    """Retrieve the drum map for a specific library.
     
     Args:
-        library: The name of the drum library to use. Defaults to "gm" (General MIDI).
+        library (str): The name of the drum library to use. Defaults to "gm" (General MIDI).
         
     Returns:
-        A DrumMap object containing the note mappings for the specified library.
+        DrumMap: A DrumMap object containing the note mappings for the specified library.
         
     Raises:
         ValueError: If the specified library is not found.

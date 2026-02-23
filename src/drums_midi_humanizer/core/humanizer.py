@@ -1,3 +1,9 @@
+"""Core humanization functionality module.
+
+This module contains the main logic for processing MIDI drum tracks, applying
+timing and velocity variations based on drummer profiles and configuration settings.
+"""
+
 from dataclasses import dataclass
 from typing import Dict, List, Tuple, Set
 import random
@@ -11,6 +17,19 @@ from ..visualization.visualizer import create_drum_visualization
 
 @dataclass
 class HumanizerConfig:
+    """Configuration parameters for the drum humanizer.
+
+    Attributes:
+        timing_variation (int): Maximum deviation in ticks for timing.
+        velocity_variation (int): Maximum deviation for velocity.
+        ghost_note_prob (float): Probability (0.0-1.0) of adding ghost notes.
+        accent_prob (float): Probability (0.0-1.0) of adding accents.
+        shuffle_amount (float): Amount of shuffle/swing to apply (0.0-0.5).
+        flamming_prob (float): Probability (0.0-1.0) of simulating flams.
+        drummer_style (str): Name of the drummer profile to use.
+        drum_library (str): Name of the drum mapping library.
+        visualize (bool): Whether to generate a visualization plot.
+    """
     timing_variation: int
     velocity_variation: int
     ghost_note_prob: float
@@ -22,9 +41,20 @@ class HumanizerConfig:
     visualize: bool = False
 
 class DrumHumanizer:
-    """Humanize MIDI drum tracks with realistic drummer feel."""
+    """Humanize MIDI drum tracks with realistic drummer feel.
+
+    This class orchestrates the humanization process, managing drummer profiles,
+    drum mappings, and the application of timing and velocity variations to
+    MIDI events.
+    """
 
     def __init__(self, config: HumanizerConfig):
+        """Initialize the DrumHumanizer with a configuration.
+
+        Args:
+            config (HumanizerConfig): Configuration object containing humanization
+                parameters and settings.
+        """
         self.config = config
         self.profile = self._get_drummer_profile()
         self.drum_map = get_drum_map(config.drum_library)
@@ -44,19 +74,23 @@ class DrumHumanizer:
         self.current_timing_variation = self.config.timing_variation
 
     def _get_drummer_profile(self) -> DrummerProfile:
-        """Get the drummer profile from config."""
+        """Retrieve the selected drummer profile based on configuration.
+
+        Returns:
+            DrummerProfile: The profile object containing style-specific constants.
+        """
         from ..config.drums import DRUMMER_PROFILES
         profile_data = DRUMMER_PROFILES[self.config.drummer_style]
         return DrummerProfile(**profile_data)
 
     def _get_measure_position(self, time: int) -> float:
-        """Get position within the measure for a given time.
+        """Calculate the beat position within a measure for a given absolute time.
         
         Args:
-            time: Current MIDI time in ticks
+            time (int): Current absolute MIDI time in ticks.
             
         Returns:
-            Position within measure from 0.0 to time_sig_numerator
+            float: Position within measure (e.g., 0.0 to 4.0 for 4/4 time).
         """
         return calculate_measure_position(
             time,
@@ -65,7 +99,16 @@ class DrumHumanizer:
         )
 
     def process_file(self, input_file: str, output_file: str | None = None) -> None:
-        """Process a MIDI file and apply humanization."""
+        """Process a MIDI file and apply humanization.
+
+        Reads the input MIDI file, applies timing and velocity variations to
+        drum notes, and saves the result. Optionally generates a visualization.
+
+        Args:
+            input_file (str): Path to the source MIDI file.
+            output_file (str | None): Path to save the humanized MIDI file. If None,
+                defaults to '{input_stem}_humanized.mid'.
+        """
         if output_file is None:
             input_path = Path(input_file)
             output_file = str(input_path.parent / f"{input_path.stem}_humanized{input_path.suffix}")
@@ -147,7 +190,20 @@ class DrumHumanizer:
         pattern_key: Tuple,
         measure_position: float,
     ) -> int:
-        """Calculate timing variations for a note."""
+        """Calculate complex timing variations for a note (Advanced Logic).
+
+        Args:
+            msg (mido.Message): The MIDI message being processed.
+            time (int): Absolute time of the event.
+            notes_by_time (Dict): Dictionary of all notes indexed by time.
+            in_fill (bool): Whether the note is part of a detected fill.
+            is_pattern_point (bool): Whether the note is part of a detected pattern.
+            pattern_key (Tuple): Key identifying the specific pattern.
+            measure_position (float): Position within the measure.
+
+        Returns:
+            int: The calculated timing offset in ticks.
+        """
         note_type_timing_var = 0
 
         # Different timing handling based on drum type
@@ -181,7 +237,18 @@ class DrumHumanizer:
         measure_position: float,
         measure_idx: int,
     ) -> int:
-        """Calculate velocity variations for a note."""
+        """Calculate complex velocity variations for a note (Advanced Logic).
+
+        Args:
+            msg (mido.Message): The MIDI message being processed.
+            time (int): Absolute time of the event.
+            in_fill (bool): Whether the note is part of a detected fill.
+            measure_position (float): Position within the measure.
+            measure_idx (int): Index of the current measure.
+
+        Returns:
+            int: The new velocity value (clamped between 1 and 127).
+        """
         velocity_var = 0
 
         # Apply different velocity patterns based on drum type
@@ -206,6 +273,7 @@ class DrumHumanizer:
         return max(1, min(127, msg.velocity + int(velocity_var)))
 
     def _handle_kick_timing(self, measure_position: float) -> float:
+        """Calculate timing variation specifically for kick drums."""
         base_var = self.config.timing_variation * 0.4 / self.profile.kick_timing_tightness
         var = random.uniform(-base_var, base_var)
         if measure_position < 0.1:
@@ -213,6 +281,7 @@ class DrumHumanizer:
         return var
 
     def _handle_snare_timing(self, measure_position: float) -> float:
+        """Calculate timing variation specifically for snare drums."""
         if self._is_backbeat(measure_position):
             return random.uniform(
                 -self.config.timing_variation * 0.7,
@@ -221,6 +290,7 @@ class DrumHumanizer:
         return random.uniform(-self.config.timing_variation, self.config.timing_variation)
 
     def _handle_hihat_timing(self, notes_by_time: Dict, time: int, measure_position: float) -> float:
+        """Calculate timing variation specifically for hi-hats."""
         hihat_var = self.config.timing_variation * self.profile.hihat_variation
         var = random.uniform(-hihat_var, hihat_var)
 
@@ -235,6 +305,7 @@ class DrumHumanizer:
         return var
 
     def _handle_cymbal_timing(self, measure_position: float) -> float:
+        """Calculate timing variation specifically for cymbals."""
         var = random.uniform(
             -self.config.timing_variation * 1.2,
             self.config.timing_variation * 1.2
@@ -244,6 +315,7 @@ class DrumHumanizer:
         return var
 
     def _handle_tom_timing(self, in_fill: bool) -> float:
+        """Calculate timing variation specifically for toms."""
         if in_fill:
             seed = random.randint(0, 1000)  # Use consistent seed for similar positions
             random.seed(seed)
@@ -256,11 +328,13 @@ class DrumHumanizer:
         return random.uniform(-self.config.timing_variation, self.config.timing_variation)
 
     def _handle_kick_velocity(self, measure_position: float) -> int:
+        """Calculate velocity adjustment for kick drums."""
         if self._is_downbeat(measure_position):
             return random.randint(0, 15) * self.profile.velocity_emphasis
         return random.randint(-10, 0) * self.profile.velocity_emphasis
 
     def _handle_snare_velocity(self, measure_position: float) -> int:
+        """Calculate velocity adjustment for snare drums."""
         if self._is_backbeat(measure_position):
             var = random.randint(0, 15) * self.profile.velocity_emphasis
             if random.random() < self.config.accent_prob * 1.5:
@@ -269,6 +343,7 @@ class DrumHumanizer:
         return random.randint(-10, 0) * self.profile.velocity_emphasis
 
     def _handle_hihat_velocity(self, measure_position: float) -> int:
+        """Calculate velocity adjustment for hi-hats."""
         sixteenth_pos = round(measure_position * 16) / 16
         if sixteenth_pos.is_integer():
             return random.randint(0, 15) * self.profile.velocity_emphasis
@@ -277,11 +352,13 @@ class DrumHumanizer:
         return random.randint(-15, 0) * self.profile.velocity_emphasis
 
     def _handle_cymbal_velocity(self, measure_position: float, measure_idx: int) -> int:
+        """Calculate velocity adjustment for cymbals."""
         if measure_position < 0.1 and measure_idx % 2 == 0:
             return random.randint(0, 20) * self.profile.velocity_emphasis
         return random.randint(-10, 0) * self.profile.velocity_emphasis
 
     def _handle_tom_velocity(self, in_fill: bool, time: int) -> int:
+        """Calculate velocity adjustment for toms, handling fill dynamics."""
         if in_fill:
             fill = next((f for f in self.merged_fills if f[0] <= time <= f[1]), None)
             if fill:
@@ -294,12 +371,14 @@ class DrumHumanizer:
         return random.randint(-15, 15) * self.profile.velocity_emphasis
 
     def _calculate_rushing_component(self, measure_position: float) -> float:
+        """Calculate the timing offset due to rushing tendencies."""
         rushing_component = self.profile.rushing_factor * 5
         if measure_position < 0.1:
             rushing_component *= 0.5
         return rushing_component
 
     def _calculate_groove_component(self, is_pattern_point: bool, pattern_key: Tuple, msg: mido.Message) -> float:
+        """Calculate the timing offset due to groove consistency."""
         if is_pattern_point and self.profile.groove_consistency > 0.6:
             pattern_seed = hash((pattern_key[0], pattern_key[1], msg.note))
             random.seed(pattern_seed)
@@ -312,27 +391,41 @@ class DrumHumanizer:
         return 0
 
     def _is_downbeat(self, measure_position: float) -> bool:
+        """Check if the position corresponds to a downbeat (1, 3 in 4/4)."""
         return measure_position < 0.1 or any(
             abs(measure_position - i) < 0.1
             for i in range(2, self.time_sig_numerator, 2)
         )
 
     def _is_backbeat(self, measure_position: float) -> bool:
+        """Check if the position corresponds to a backbeat (2, 4 in 4/4)."""
         return any(
             abs(measure_position - i) < 0.1
             for i in range(1, self.time_sig_numerator, 2)
         )
 
     def _is_offbeat_eighth(self, measure_position: float) -> bool:
+        """Check if the position is an offbeat eighth note."""
         eighth_note_pos = round(measure_position * 8) / 8
         return eighth_note_pos % 0.5 == 0 and eighth_note_pos % 1.0 != 0
 
     def _has_kick_or_snare_at_time(self, notes_by_time: Dict, time: int) -> bool:
+        """Check if a kick or snare occurs at the specified time."""
         other_drums = notes_by_time.get(time, [])
         return any(n in self.KICK_NOTES or n in self.SNARE_NOTES for n in other_drums)
     
     def _apply_timing_variation(self, time: int, note: int) -> int:
-        """Apply timing variation based on note type and drummer profile."""
+        """Apply timing variation based on note type and drummer profile.
+
+        This is the primary timing logic used by `process_file`.
+
+        Args:
+            time (int): The original absolute timestamp.
+            note (int): The MIDI note number.
+
+        Returns:
+            int: The new absolute timestamp with humanization applied.
+        """
         measure_pos = self._get_measure_position(time)
         
         # Base variation based on groove consistency
@@ -358,7 +451,18 @@ class DrumHumanizer:
         return int(time + variation + rush_amount + shuffle)
 
     def _apply_velocity_variation(self, velocity: int, note: int, measure_pos: float) -> int:
-        """Apply velocity variation based on note type and drummer profile."""
+        """Apply velocity variation based on note type and drummer profile.
+
+        This is the primary velocity logic used by `process_file`.
+
+        Args:
+            velocity (int): The original velocity.
+            note (int): The MIDI note number.
+            measure_pos (float): The position within the measure.
+
+        Returns:
+            int: The new velocity value.
+        """
         if note in self.KICK_NOTES or note in self.SNARE_NOTES:
             # Emphasize strong beats
             emphasis = 1.0 + (0.2 * self.profile.velocity_emphasis * (1 - (measure_pos % 1)))
@@ -379,7 +483,17 @@ class DrumHumanizer:
         return max(1, min(127, new_velocity))
 
     def _detect_and_apply_rudiments(self, notes: List[Tuple[int, int, int]]) -> List[Tuple[int, int, int]]:
-        """Detect and apply humanization to drum rudiments."""
+        """Detect and apply humanization to drum rudiments.
+
+        Scans a sequence of notes for known rudiment patterns and applies specific
+        timing and velocity curves if matches are found.
+
+        Args:
+            notes (List[Tuple[int, int, int]]): List of (time, note, velocity) tuples.
+
+        Returns:
+            List[Tuple[int, int, int]]: The processed list of notes.
+        """
         if len(notes) < 2:
             return notes
             

@@ -1,4 +1,10 @@
-"""Visualization tools for MIDI drum patterns."""
+"""Visualization tools for MIDI drum patterns.
+
+This module provides functionality to generate visual comparisons between original
+and humanized MIDI drum tracks. It includes the `DrumVisualizer` class for
+creating comprehensive plots using `mido` messages, and standalone functions
+for simpler tuple-based data structures.
+"""
 
 from typing import List, Tuple, Dict
 import matplotlib.pyplot as plt
@@ -6,7 +12,12 @@ import numpy as np
 import mido
 
 class DrumVisualizer:
-    """Class for creating visualizations of MIDI drum patterns."""
+    """Class for creating visualizations of MIDI drum patterns.
+
+    Attributes:
+        drum_categories (Dict): Mapping of drum types to their MIDI note numbers and display colors.
+        analysis_window (int): Window size in beats for timing analysis.
+    """
 
     def __init__(self):
         """Initialize the visualizer with default settings."""
@@ -29,13 +40,13 @@ class DrumVisualizer:
         """Create a detailed visualization comparing original and humanized MIDI drum patterns.
 
         Args:
-            original_messages: List of (time, message) tuples for original MIDI
-            humanized_messages: List of (time, message) tuples for humanized MIDI
-            output_path: Path to save the visualization
-            ticks_per_beat: MIDI ticks per quarter note
+            original_messages: List of (time, message) tuples for original MIDI.
+            humanized_messages: List of (time, message) tuples for humanized MIDI.
+            output_path: Path to save the visualization.
+            ticks_per_beat: MIDI ticks per quarter note (default: 480).
 
         Returns:
-            bool: True if visualization was created successfully
+            bool: True if visualization was created successfully, False otherwise.
         """
         try:
             print(f"\nGenerating visualization: {output_path}")
@@ -97,7 +108,14 @@ class DrumVisualizer:
         alpha: float = 1.0,
         title: str = ""
     ) -> None:
-        """Plot MIDI notes on the given axes with improved visualization."""
+        """Plot MIDI notes on the given axes with improved visualization.
+
+        Args:
+            ax: The matplotlib Axes object to plot on.
+            messages: List of (time, message) tuples.
+            alpha: Transparency level for the scatter points.
+            title: Title for the subplot.
+        """
         times = [t for t, m in messages if m.type == "note_on" and m.velocity > 0]
         notes = [m.note for t, m in messages if m.type == "note_on" and m.velocity > 0]
         velocities = [m.velocity * 3 for t, m in messages if m.type == "note_on" and m.velocity > 0]
@@ -145,7 +163,17 @@ class DrumVisualizer:
         velocities: List[int],
         category_notes: Tuple[int, ...]
     ) -> Tuple[List[int], List[int], List[int]]:
-        """Filter notes by category."""
+        """Filter notes by category.
+
+        Args:
+            times: List of note timestamps.
+            notes: List of MIDI note numbers.
+            velocities: List of note velocities.
+            category_notes: Tuple of MIDI note numbers belonging to the category.
+
+        Returns:
+            Tuple containing filtered lists of times, notes, and velocities.
+        """
         cat_times = []
         cat_notes = []
         cat_vels = []
@@ -159,7 +187,12 @@ class DrumVisualizer:
         return cat_times, cat_notes, cat_vels
 
     def _add_grid_lines(self, ax: plt.Axes, times: List[int]) -> None:
-        """Add beat grid lines to the plot."""
+        """Add beat grid lines to the plot.
+
+        Args:
+            ax: The matplotlib Axes object.
+            times: List of timestamps to determine the range of the grid.
+        """
         if times:
             ticks_per_beat = 480  # Standard MIDI resolution
             max_time = max(times)
@@ -174,7 +207,13 @@ class DrumVisualizer:
             )
 
     def _setup_axes(self, ax: plt.Axes, title: str, notes: List[int]) -> None:
-        """Configure axes labels and appearance."""
+        """Configure axes labels and appearance.
+
+        Args:
+            ax: The matplotlib Axes object.
+            title: Title for the axes.
+            notes: List of MIDI note numbers present in the data.
+        """
         ax.set_title(title)
         ax.set_ylabel("Drum Type")
         ax.grid(True, alpha=0.2)
@@ -196,7 +235,12 @@ class DrumVisualizer:
             ax.set_xlabel("Beats")
 
     def _setup_legend(self, ax_legend: plt.Axes, plot_axes: List[plt.Axes]) -> None:
-        """Set up the shared legend."""
+        """Set up the shared legend.
+
+        Args:
+            ax_legend: The matplotlib Axes object dedicated to the legend.
+            plot_axes: List of Axes objects containing the plots to generate the legend from.
+        """
         ax_legend.axis("off")
         handles = []
         labels = []
@@ -218,7 +262,11 @@ class DrumVisualizer:
         )
 
     def _get_note_names(self) -> Dict[int, str]:
-        """Get dictionary of MIDI note numbers to drum names."""
+        """Get dictionary of MIDI note numbers to drum names.
+
+        Returns:
+            Dict[int, str]: Mapping of MIDI note numbers to descriptive drum names.
+        """
         return {
             35: "Acoustic Bass Drum",
             36: "Bass Drum 1",
@@ -249,7 +297,14 @@ class DrumVisualizer:
         humanized_messages: List[Tuple[int, mido.Message]],
         ticks_per_beat: int
     ) -> None:
-        """Plot timing variation analysis."""
+        """Plot timing variation analysis.
+
+        Args:
+            ax: The matplotlib Axes object.
+            original_messages: List of original MIDI messages.
+            humanized_messages: List of humanized MIDI messages.
+            ticks_per_beat: Resolution of the MIDI file.
+        """
         def get_timing_variations(messages):
             times = np.array([t for t, m in messages if m.type == "note_on" and m.velocity > 0])
             if len(times) < 2:
@@ -277,7 +332,13 @@ class DrumVisualizer:
         original_messages: List[Tuple[int, mido.Message]],
         humanized_messages: List[Tuple[int, mido.Message]]
     ) -> None:
-        """Plot velocity distribution analysis."""
+        """Plot velocity distribution analysis.
+
+        Args:
+            ax: The matplotlib Axes object.
+            original_messages: List of original MIDI messages.
+            humanized_messages: List of humanized MIDI messages.
+        """
         def get_velocities(messages):
             return [m.velocity for _, m in messages if m.type == "note_on" and m.velocity > 0]
             
@@ -299,6 +360,8 @@ def create_drum_visualization(original_messages: List[Tuple[int, int, int]],
                             humanized_messages: List[Tuple[int, int, int]],
                             output_png: str) -> None:
     """Create a detailed visualization comparing original and humanized MIDI drum patterns.
+
+    This function uses a simpler input format (tuples of ints) compared to the class-based method.
 
     Args:
         original_messages: List of (time, note, velocity) tuples from original MIDI.
@@ -338,7 +401,14 @@ def create_drum_visualization(original_messages: List[Tuple[int, int, int]],
 
 def _plot_drum_grid(messages: List[Tuple[int, int, int]], categories: dict,
                    ax: plt.Axes, title: str) -> None:
-    """Plot a grid of drum hits colored by category and sized by velocity."""
+    """Plot a grid of drum hits colored by category and sized by velocity.
+
+    Args:
+        messages: List of (time, note, velocity) tuples.
+        categories: Dictionary mapping category names to lists of note numbers.
+        ax: The matplotlib Axes object.
+        title: Title for the plot.
+    """
     colors = plt.cm.tab10(np.linspace(0, 1, len(categories)))
     
     for i, (cat, notes) in enumerate(categories.items()):
@@ -361,7 +431,13 @@ def _plot_drum_grid(messages: List[Tuple[int, int, int]], categories: dict,
 def _plot_velocity_differences(original: List[Tuple[int, int, int]],
                              humanized: List[Tuple[int, int, int]],
                              ax: plt.Axes) -> None:
-    """Plot the velocity differences between original and humanized notes."""
+    """Plot the velocity differences between original and humanized notes.
+
+    Args:
+        original: List of (time, note, velocity) tuples for original MIDI.
+        humanized: List of (time, note, velocity) tuples for humanized MIDI.
+        ax: The matplotlib Axes object.
+    """
     # Create lookup for humanized velocities
     humanized_dict = {(t, n): v for t, n, v in humanized}
     

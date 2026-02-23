@@ -1,19 +1,29 @@
-"""Utility functions for MIDI drum humanization."""
+"""Utility functions for MIDI drum humanization.
+
+This module provides helper functions for processing MIDI data, including
+time conversion, note grouping, pattern detection, and fill identification.
+These utilities support the core humanization logic by abstracting common
+MIDI operations.
+"""
 
 from typing import Dict, List, Set, Tuple
 import mido
 
 
 def calculate_measure_position(time: int, ticks_per_beat: int, time_sig_numerator: int = 4) -> float:
-    """Calculate the position within a measure (0.0 to time_sig_numerator).
+    """Calculate the beat position within a measure.
+
+    Determines where a specific timestamp falls within a measure, expressed
+    as a beat index (e.g., 0.0 for the start of the measure, 1.0 for the
+    second beat in 4/4).
 
     Args:
-        time: Current MIDI time in ticks
-        ticks_per_beat: MIDI file's ticks per quarter note
-        time_sig_numerator: Time signature numerator (e.g., 4 for 4/4)
+        time (int): Current MIDI time in ticks.
+        ticks_per_beat (int): The MIDI file's resolution (ticks per quarter note).
+        time_sig_numerator (int): The numerator of the time signature (default: 4).
 
     Returns:
-        Position within the measure as a float from 0.0 to time_sig_numerator
+        float: The beat position within the measure (0.0 <= position < time_sig_numerator).
     """
     beats = time / ticks_per_beat
     return beats % time_sig_numerator
@@ -21,23 +31,26 @@ def calculate_measure_position(time: int, ticks_per_beat: int, time_sig_numerato
 
 def detect_rudiment_pattern(notes: List[Tuple[int, int, int]], pattern: List[str], timing_ratios: List[float], 
                           ticks_per_beat: int, tolerance: float = 0.1) -> bool:
-    """Check if a sequence of notes matches a rudiment pattern.
+    """Check if a sequence of notes matches a specific rudiment pattern.
+
+    Analyzes a sequence of notes to see if their relative timing matches
+    a predefined rhythmic pattern (e.g., a flam or drag), within a given tolerance.
 
     Args:
-        notes: List of (time, note, velocity) tuples
-        pattern: List of hand patterns ('R', 'L', 'r', 'l' where lowercase indicates grace notes)
-        timing_ratios: List of relative timing ratios between notes
-        ticks_per_beat: MIDI file's ticks per quarter note
-        tolerance: Timing tolerance for pattern matching (0.0-1.0)
+        notes (List[Tuple[int, int, int]]): List of (time, note, velocity) tuples.
+        pattern (List[str]): List of hand patterns (unused in logic but kept for signature).
+        timing_ratios (List[float]): Expected relative timing ratios between notes.
+        ticks_per_beat (int): The MIDI file's resolution.
+        tolerance (float): Maximum allowed deviation in beats (default: 0.1).
 
     Returns:
-        True if the pattern matches, False otherwise
+        bool: True if the notes match the timing pattern, False otherwise.
     """
     if len(notes) != len(pattern):
         return False
 
-    # Convert timing ratios to ticks
-    expected_times = [0]
+    # Convert timing ratios to absolute tick offsets relative to the start
+    expected_times = [0.0]
     total_ratio = sum(timing_ratios)
     for ratio in timing_ratios[:-1]:
         expected_times.append(expected_times[-1] + (ratio / total_ratio) * ticks_per_beat)
@@ -54,14 +67,18 @@ def detect_rudiment_pattern(notes: List[Tuple[int, int, int]], pattern: List[str
 
 
 def get_note_groups(drum_map: Dict[int, str]) -> Tuple[Set[int], Set[int], Set[int], Set[int], Set[int]]:
-    """Group drum notes by type based on the provided drum map.
+    """Group drum notes by instrument category based on their names.
+
+    Parses the drum map names to categorize MIDI note numbers into Kicks,
+    Snares, Hi-hats, Toms, and Cymbals. This allows the humanizer to apply
+    instrument-specific logic.
 
     Args:
-        drum_map: Dictionary mapping MIDI note numbers to drum names
+        drum_map (Dict[int, str]): Dictionary mapping MIDI note numbers to drum names.
 
     Returns:
-        Tuple of Sets containing MIDI note numbers for:
-        (kick notes, snare notes, hihat notes, tom notes, cymbal notes)
+        Tuple[Set[int], ...]: A tuple containing five sets of note numbers:
+            (kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes).
     """
     kick_notes = set()
     snare_notes = set()
@@ -86,13 +103,18 @@ def get_note_groups(drum_map: Dict[int, str]) -> Tuple[Set[int], Set[int], Set[i
 
 
 def get_absolute_times(track: mido.MidiTrack) -> List[Tuple[int, mido.Message]]:
-    """Convert relative MIDI times to absolute times.
+    """Convert a MIDI track with relative delta times to absolute timestamps.
+
+    Mido tracks store events with 'time' representing the delta since the
+    last event. This function calculates the cumulative absolute time for
+    easier processing.
 
     Args:
-        track: MIDI track with relative timing
+        track (mido.MidiTrack): The input MIDI track with relative timing.
 
     Returns:
-        List of tuples containing (absolute time, MIDI message)
+        List[Tuple[int, mido.Message]]: A list of tuples where each contains
+            the absolute timestamp (in ticks) and the MIDI message.
     """
     messages = []
     current_time = 0
@@ -107,13 +129,17 @@ def get_absolute_times(track: mido.MidiTrack) -> List[Tuple[int, mido.Message]]:
 def convert_to_relative_times(
     messages: List[Tuple[int, mido.Message]]
 ) -> List[Tuple[int, mido.Message]]:
-    """Convert absolute MIDI times back to relative times.
+    """Convert absolute timestamps back to relative delta times for MIDI export.
+
+    Reverses the operation of `get_absolute_times`, preparing the messages
+    to be written back to a MIDI track.
 
     Args:
-        messages: List of (absolute time, message) tuples
+        messages (List[Tuple[int, mido.Message]]): List of (absolute_time, message) tuples.
 
     Returns:
-        List of (relative time, message) tuples
+        List[Tuple[int, mido.Message]]: List of (delta_time, message) tuples,
+            sorted by time.
     """
     sorted_messages = sorted(messages, key=lambda x: x[0])
     relative_messages = []
@@ -132,15 +158,20 @@ def detect_fills(
     primary_subdivision: int,
     tom_notes: Set[int]
 ) -> List[Tuple[int, int]]:
-    """Detect fill sections in the MIDI data based on tom patterns.
+    """Detect potential drum fill sections based on tom activity.
+
+    Identifies sections where tom hits occur in rapid succession, which
+    often indicates a drum fill.
 
     Args:
-        notes_by_time: Dictionary mapping time to list of MIDI messages
-        primary_subdivision: Basic rhythmic subdivision in ticks
-        tom_notes: Set of MIDI note numbers representing toms
+        notes_by_time (Dict[int, List[mido.Message]]): Dictionary mapping absolute
+            timestamps to lists of MIDI messages occurring at that time.
+        primary_subdivision (int): The tick duration of a primary subdivision.
+        tom_notes (Set[int]): Set of MIDI note numbers identified as toms.
 
     Returns:
-        List of (start_time, end_time) tuples representing fills
+        List[Tuple[int, int]]: A list of (start_time, end_time) tuples defining
+            the detected fill regions.
     """
     fills = []
     times = sorted(notes_by_time.keys())
@@ -148,7 +179,8 @@ def detect_fills(
     for i in range(len(times) - 1):
         curr_time = times[i]
         next_time = times[i + 1]
-        notes_at_curr = [msg.note for msg in notes_by_time[curr_time]]
+        notes_at_curr = [msg.note for msg in notes_by_time[curr_time] 
+                        if hasattr(msg, 'note')]
 
         # Check for multiple toms in short succession
         if (
@@ -167,39 +199,25 @@ def detect_fills(
 
 
 def merge_overlapping_fills(fills: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
-    """Merge overlapping fill regions.
+    """Merge overlapping or adjacent fill regions into continuous blocks.
 
     Args:
-        fills: List of (start_time, end_time) tuples
+        fills (List[Tuple[int, int]]): List of (start_time, end_time) tuples.
 
     Returns:
-        List of merged (start_time, end_time) tuples
+        List[Tuple[int, int]]: A sorted list of merged time ranges.
     """
     if not fills:
         return []
 
+    # Sort by start time
+    sorted_fills = sorted(fills, key=lambda x: x[0])
     merged = []
-    for fill in sorted(fills):
+    
+    for fill in sorted_fills:
         if not merged or fill[0] > merged[-1][1]:
             merged.append(fill)
         else:
             merged[-1] = (merged[-1][0], max(merged[-1][1], fill[1]))
 
     return merged
-
-
-def calculate_measure_position(time: int, ticks_per_beat: int, time_sig_numerator: int = 4) -> float:
-    """Calculate the position within a measure.
-
-    Args:
-        time: Time in ticks.
-        ticks_per_beat: Number of ticks per beat.
-        time_sig_numerator: Time signature numerator (default: 4).
-
-    Returns:
-        Position within the measure as a float between 0 and time_sig_numerator.
-    """
-    beats_per_measure = float(time_sig_numerator)
-    measure_length_ticks = ticks_per_beat * beats_per_measure
-    position = (time % measure_length_ticks) / ticks_per_beat
-    return position
