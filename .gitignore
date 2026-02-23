@@ -170,3 +170,12 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 .archive/
+
+# IDEs
+.idea/
+.vscode/
+
+# Generated files
+*.mid
+*.midi
+*.png
