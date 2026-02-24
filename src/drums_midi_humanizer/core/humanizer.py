@@ -40,6 +40,15 @@ class HumanizerConfig:
     drum_library: str
     visualize: bool = False
 
+    def __post_init__(self):
+        """Validate configuration parameters."""
+        if not 0 <= self.ghost_note_prob <= 1:
+            raise ValueError(f"Ghost note probability must be between 0.0 and 1.0, got {self.ghost_note_prob}")
+        if not 0 <= self.accent_prob <= 1:
+            raise ValueError(f"Accent probability must be between 0.0 and 1.0, got {self.accent_prob}")
+        if not 0 <= self.flamming_prob <= 1:
+            raise ValueError(f"Flam probability must be between 0.0 and 1.0, got {self.flamming_prob}")
+
 class DrumHumanizer:
     """Humanize MIDI drum tracks with realistic drummer feel.
 
