@@ -23,15 +23,15 @@ def parse_args() -> argparse.Namespace:
         argparse.Namespace: An object containing the parsed command-line arguments.
             - input_file (str): Path to the source MIDI file.
             - output (str): Path to the destination MIDI file.
+            - style (str): Drummer style profile name.
+            - library (str): Drum library mapping name.
+            - visualize (bool): Whether to generate a visualization.
             - timing (int): Max timing variation in ticks.
             - velocity (int): Max velocity variation.
             - ghost (float): Probability of ghost notes (0.0-1.0).
             - accent (float): Probability of accents (0.0-1.0).
             - shuffle (float): Shuffle amount (0.0-0.5).
             - flams (float): Probability of flams (0.0-1.0).
-            - style (str): Drummer style profile name.
-            - library (str): Drum library mapping name.
-            - visualize (bool): Whether to generate a visualization.
     """
     parser = argparse.ArgumentParser(
         description="Humanize MIDI drum tracks with realistic drummer feel",
@@ -41,6 +41,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output", "-o",
         help="Output MIDI file path (default: input_file_humanized.mid)"
+    )
+    parser.add_argument(
+        "--style",
+        choices=list(DRUMMER_PROFILES.keys()),
+        default="balanced",
+        help="Drummer style profile (default: balanced)"
+    )
+    parser.add_argument(
+        "--library",
+        choices=["gm", "ad2", "sd3", "ez2", "ssd5", "mtpk2"],
+        default="gm",
+        help="Drums library mapping (default: gm)"
+    )
+    parser.add_argument(
+        "--visualize",
+        action="store_true",
+        help="Generate visualization comparing original and humanized MIDI"
     )
     parser.add_argument(
         "--timing", "-t",
@@ -71,23 +88,6 @@ def parse_args() -> argparse.Namespace:
         "--flams", "-f",
         type=float, default=0.0,
         help="Flam probability (default: 0.0)"
-    )
-    parser.add_argument(
-        "--style",
-        choices=list(DRUMMER_PROFILES.keys()),
-        default="balanced",
-        help="Drummer style profile (default: balanced)"
-    )
-    parser.add_argument(
-        "--library",
-        choices=["gm", "ad2", "sd3", "ez2", "ssd5", "mtpk2"],
-        default="gm",
-        help="Drums library mapping (default: gm)"
-    )
-    parser.add_argument(
-        "--visualize",
-        action="store_true",
-        help="Generate visualization comparing original and humanized MIDI"
     )
     return parser.parse_args()
 
