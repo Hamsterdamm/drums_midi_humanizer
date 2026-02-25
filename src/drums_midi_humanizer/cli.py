@@ -13,6 +13,30 @@ from .core.humanizer import DrumHumanizer, HumanizerConfig
 from .config.drums import DRUMMER_PROFILES
 
 
+def _valid_probability(arg: str) -> float:
+    """Validator for probability values (0.0-1.0)."""
+    try:
+        value = float(arg)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid float value: {arg}")
+
+    if not (0.0 <= value <= 1.0):
+        raise argparse.ArgumentTypeError(f"Value must be between 0.0 and 1.0, got {value}")
+    return value
+
+
+def _valid_shuffle(arg: str) -> float:
+    """Validator for shuffle values (0.0-0.5)."""
+    try:
+        value = float(arg)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid float value: {arg}")
+
+    if not (0.0 <= value <= 0.5):
+        raise argparse.ArgumentTypeError(f"Value must be between 0.0 and 0.5, got {value}")
+    return value
+
+
 def parse_args() -> argparse.Namespace:
     """Parse and validate command-line arguments.
 
@@ -71,22 +95,22 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--ghost", "-g",
-        type=float, default=0.1,
+        type=_valid_probability, default=0.1,
         help="Ghost note probability (default: 0.1)"
     )
     parser.add_argument(
         "--accent", "-a",
-        type=float, default=0.2,
+        type=_valid_probability, default=0.2,
         help="Accent probability (default: 0.2)"
     )
     parser.add_argument(
         "--shuffle", "-s",
-        type=float, default=0.0,
+        type=_valid_shuffle, default=0.0,
         help="Shuffle amount, 0.0-0.5 (default: 0.0)"
     )
     parser.add_argument(
         "--flams", "-f",
-        type=float, default=0.0,
+        type=_valid_probability, default=0.0,
         help="Flam probability (default: 0.0)"
     )
     return parser.parse_args()
@@ -106,23 +130,6 @@ def main() -> None:
     # Validate input file existence
     if not Path(args.input_file).exists():
         print(f"Error: Input file not found: {args.input_file}")
-        return
-
-    # Validate probability ranges
-    if not 0 <= args.ghost <= 1:
-        print("Error: Ghost note probability must be between 0.0 and 1.0")
-        return
-
-    if not 0 <= args.accent <= 1:
-        print("Error: Accent probability must be between 0.0 and 1.0")
-        return
-
-    if not 0 <= args.shuffle <= 0.5:
-        print("Error: Shuffle amount must be between 0.0 and 0.5")
-        return
-
-    if not 0 <= args.flams <= 1:
-        print("Error: Flam probability must be between 0.0 and 1.0")
         return
 
     # Create humanizer configuration object from arguments
