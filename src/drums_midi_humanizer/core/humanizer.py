@@ -170,6 +170,39 @@ class DrumHumanizer:
                 original_messages_for_viz, humanized_messages_for_viz, visualization_file
             )
 
+    def _generate_ghost_notes(self, events: List[Tuple[int, mido.Message]]) -> List[Tuple[int, int, int]]:
+        """Generate ghost notes based on probability and empty spaces."""
+        if not events:
+            return []
+            
+        ghosts = []
+        last_time = events[-1][0]
+        sixteenth_ticks = self.ticks_per_beat // 4
+        
+        # Map occupied 16th slots
+        occupied_slots = set()
+        for time, msg in events:
+            if msg.type == 'note_on' and msg.velocity > 0:
+                slot = round(time / sixteenth_ticks)
+                occupied_slots.add(slot)
+        
+        # Iterate slots
+        num_slots = int(last_time / sixteenth_ticks)
+        snare_note = list(self.SNARE_NOTES)[0] if self.SNARE_NOTES else 38
+        
+        for i in range(num_slots):
+            if i not in occupied_slots:
+                # Probability check
+                if random.random() < self.config.ghost_note_prob * 0.4:
+                    time = int(i * sixteenth_ticks)
+                    # Add some timing variation
+                    time += random.randint(-self.config.timing_variation, self.config.timing_variation)
+                    if time < 0: time = 0
+                    velocity = random.randint(15, 40)
+                    ghosts.append((time, snare_note, velocity))
+                    
+        return ghosts
+
     def _humanize_track(
         self, track: mido.MidiTrack
     ) -> Tuple[mido.MidiTrack, List[Tuple], List[Tuple]]:
@@ -233,6 +266,15 @@ class DrumHumanizer:
             elif msg.type != "note_off":  # Keep other messages, discard original note_offs
                 processed_events.append((time, msg))
 
+        # Add ghost notes
+        if self.config.ghost_note_prob > 0:
+            ghost_notes = self._generate_ghost_notes(events_with_absolute_time)
+            for t, n, v in ghost_notes:
+                processed_events.append((t, mido.Message("note_on", note=n, velocity=v)))
+                processed_events.append((t + self.ticks_per_beat // 4, mido.Message("note_off", note=n, velocity=0)))
+                humanized_messages.append((t, n, v))
+        
+        processed_events.sort(key=lambda x: x[0])
         logger.info(f"Processed {notes_processed_count} notes in track.")
 
         relative_time_events = convert_to_relative_times(processed_events)
