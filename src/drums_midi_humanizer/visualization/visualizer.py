@@ -119,6 +119,7 @@ class DrumVisualizer:
         """
         times = [t for t, m in messages if m.type == "note_on" and m.velocity > 0]
         notes = [m.note for t, m in messages if m.type == "note_on" and m.velocity > 0]
+        # Scale velocity for visual size: raw velocity (0-127) is too small for scatter plot points
         velocities = [m.velocity * 3 for t, m in messages if m.type == "note_on" and m.velocity > 0]
 
         if not times:
@@ -318,6 +319,9 @@ class DrumVisualizer:
             if len(times) < 2:
                 return np.array([])
             intervals = np.diff(times)
+            # Calculate deviation from the nearest 16th note grid.
+            # We assume the original intent was grid-aligned, so the remainder
+            # after division by 16th note duration represents the "human" deviation.
             return intervals - np.round(intervals / (ticks_per_beat / 4)) * (ticks_per_beat / 4)
 
         orig_vars = get_timing_variations(original_messages)

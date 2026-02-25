@@ -139,6 +139,7 @@ def main() -> None:
     logger.debug(f"Arguments parsed: {args}")
 
     # Validate input file existence
+    # Fail fast before initializing heavy configuration or processing logic
     if not Path(args.input_file).exists():
         logger.error(f"Input file not found: {args.input_file}")
         return

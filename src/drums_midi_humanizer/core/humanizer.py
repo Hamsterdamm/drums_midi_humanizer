@@ -192,7 +192,10 @@ class DrumHumanizer:
         
         for i in range(num_slots):
             if i not in occupied_slots:
-                # Probability check
+                # Probability check.
+                # We scale down the global probability (0.4 factor) because we are iterating
+                # over every single 16th note slot. Without scaling, a 10% probability
+                # would result in an unrealistically busy ghost note pattern.
                 if random.random() < self.config.ghost_note_prob * 0.4:
                     time = int(i * sixteenth_ticks)
                     # Add some timing variation
@@ -219,6 +222,8 @@ class DrumHumanizer:
         events_with_absolute_time = get_absolute_times(track)
 
         # Build context: notes by time
+        # We need random access to notes occurring at specific times to make context-aware decisions
+        # (e.g., adjusting hi-hat timing if a snare is played at the same time).
         notes_by_time = {}
         for time, msg in events_with_absolute_time:
             if msg.type == "note_on" and msg.velocity > 0:
@@ -227,6 +232,7 @@ class DrumHumanizer:
                 notes_by_time[time].append(msg)
 
         # Detect fills
+        # Fills usually happen on faster subdivisions (16th notes or faster), so we use that as a heuristic.
         primary_subdivision = self.ticks_per_beat // 4
         self.merged_fills = detect_fills(notes_by_time, primary_subdivision, self.TOM_NOTES)
 
@@ -254,16 +260,20 @@ class DrumHumanizer:
                     msg, time, in_fill, measure_pos, measure_idx
                 )
 
+                # We reconstruct note_on and note_off events completely.
+                # Shifting a note_on requires shifting the corresponding note_off to maintain duration,
+                # but since we might change duration or timing, it's safer to generate fresh pairs.
                 processed_events.append(
                     (new_time, mido.Message("note_on", note=msg.note, velocity=new_velocity))
                 )
+                # Use a fixed short duration for drum hits to ensure clean triggering.
                 processed_events.append(
                     (new_time + 1, mido.Message("note_off", note=msg.note, velocity=0))
                 )
 
                 humanized_messages.append((new_time, msg.note, new_velocity))
 
-            elif msg.type != "note_off":  # Keep other messages, discard original note_offs
+            elif msg.type != "note_off":  # Keep other messages (CC, pitch bend), discard original note_offs
                 processed_events.append((time, msg))
 
         # Add ghost notes
@@ -337,6 +347,7 @@ class DrumHumanizer:
             note_type_timing_var + rushing_component + groove_component + self.tempo_drift
         )
         max_var = self.config.timing_variation * 2
+        # Clamp the variation to prevent extreme outliers that would break the rhythm entirely.
         return max(-max_var, min(max_var, total_timing_var))
 
     def humanize_velocity(
@@ -389,6 +400,8 @@ class DrumHumanizer:
         base_var = self.config.timing_variation * 0.4 / self.profile.kick_timing_tightness
         var = random.uniform(-base_var, base_var)
         if measure_position < 0.1:
+            # Kick drums on the downbeat (beat 1) define the start of the measure.
+            # Drummers tend to be slightly ahead or behind consistently, but usually tighter here.
             var -= min(2, 1 + self.profile.rushing_factor)
         return var
 
@@ -415,6 +428,8 @@ class DrumHumanizer:
             var += int(self.config.shuffle_amount * self.ticks_per_beat / 2)
 
         # Adjust timing based on kick/snare presence
+        # When hitting multiple drums simultaneously, limbs interact.
+        # This tightens the timing when a hi-hat coincides with a kick or snare.
         if self._has_kick_or_snare_at_time(notes_by_time, time):
             var *= 0.7
 
@@ -496,6 +511,9 @@ class DrumHumanizer:
     ) -> float:
         """Calculate the timing offset due to groove consistency."""
         if is_pattern_point and self.profile.groove_consistency > 0.6:
+            # Use a deterministic seed based on the pattern key.
+            # This ensures that every time this specific pattern occurs, the timing deviation
+            # is identical, simulating a drummer's consistent "pocket" or "feel" for that groove.
             pattern_seed = hash((pattern_key[0], pattern_key[1], msg.note))
             random.seed(pattern_seed)
             groove_component = random.uniform(

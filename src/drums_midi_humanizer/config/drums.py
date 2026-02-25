@@ -17,12 +17,19 @@ class DrummerProfile:
 
     Attributes:
         timing_bias (float): Base timing offset in ticks (positive = late/lazy, negative = early/rushed).
+            Simulates the "pocket" - playing consistently behind or ahead of the click.
         velocity_emphasis (float): Multiplier for velocity dynamics (1.0 = standard, >1.0 = more dynamic).
+            Expands the dynamic range to make accents punchier and ghost notes quieter.
         ghost_multiplier (float): Velocity multiplier for ghost notes (0.0-1.0).
+            Controls the subtlety of non-accented notes (lower = more subtle/quiet).
         kick_timing_tightness (float): How tight the kick drum is to the grid (higher = tighter).
+            Kicks often anchor the band, so they are typically played tighter than snares/hats.
         hihat_variation (float): Amount of timing variation for hi-hats.
+            Hi-hats usually carry the micro-timing "swing" or "slop" of the groove.
         rushing_factor (float): Tendency to rush (positive) or drag (negative) tempo.
+            Simulates tempo drift over time rather than a static offset.
         groove_consistency (float): How consistent the timing variations are (0.0-1.0).
+            Determines if the errors are random (amateur) or consistent (stylistic/professional).
         rudiment_sensitivity (float): Probability threshold for applying rudiment logic (0.0-1.0).
     """
 
@@ -202,6 +209,8 @@ DRUM_RUDIMENTS = {
     "single_paradiddle": {
         "pattern": ["R", "L", "R", "R", "L", "R", "L", "L"],  # RLRR LRLL
         "timing_ratio": [1, 1, 1, 1, 1, 1, 1, 1],  # Even timing
+        # Physics of sticking: The second note of a double (RR or LL) is a rebound,
+        # naturally slightly quieter than the initial stroke.
         "velocity_ratio": [1.0, 0.8, 0.9, 0.85, 1.0, 0.8, 0.9, 0.85],
         "duration": 2,  # Duration in beats
     },

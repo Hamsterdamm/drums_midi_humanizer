@@ -32,6 +32,10 @@ def calculate_measure_position(
         float: The beat position within the measure (0.0 <= position < time_sig_numerator).
     """
     beats = time / ticks_per_beat
+    # Modulo operation wraps the beat count to the measure length,
+    # giving us the position relative to the start of the current measure.
+    # We map the linear timeline to a cyclical musical grid to apply
+    # groove patterns that repeat every measure (e.g., emphasizing the 'one').
     return beats % time_sig_numerator
 
 
@@ -58,19 +62,27 @@ def detect_rudiment_pattern(
         bool: True if the notes match the timing pattern, False otherwise.
     """
     if len(notes) != len(pattern):
+        # If the note count doesn't match the pattern definition, it's definitely not a match.
         return False
 
-    # Convert timing ratios to absolute tick offsets relative to the start
+    # Convert timing ratios to absolute tick offsets relative to the start.
+    # We normalize against the total ratio to match the rhythmic *shape* (relative proportions)
+    # rather than specific durations. This allows the same pattern definition to match
+    # both 8th-note and 16th-note versions of the rudiment.
     expected_times = [0.0]
     total_ratio = sum(timing_ratios)
     for ratio in timing_ratios[:-1]:
         expected_times.append(expected_times[-1] + (ratio / total_ratio) * ticks_per_beat)
 
     # Compare actual note timings with expected timings
+    # We use the first note as the anchor (time 0) to make the check independent
+    # of the absolute position in the track (translation invariance).
     first_time = notes[0][0]
     for i in range(1, len(notes)):
+        # Calculate the delta relative to the start of the sequence
         actual_delta = notes[i][0] - first_time
         expected_delta = expected_times[i]
+        # Check if deviation is within the tolerance threshold (converted to ticks)
         if abs(actual_delta - expected_delta) > (tolerance * ticks_per_beat):
             return False
 
@@ -82,9 +94,9 @@ def get_note_groups(
 ) -> Tuple[Set[int], Set[int], Set[int], Set[int], Set[int]]:
     """Group drum notes by instrument category based on their names.
 
-    Parses the drum map names to categorize MIDI note numbers into Kicks,
-    Snares, Hi-hats, Toms, and Cymbals. This allows the humanizer to apply
-    instrument-specific logic.
+    Parses the drum map names to categorize MIDI note numbers. This abstraction
+    allows the core humanization logic to remain agnostic of the specific VST
+    library or MIDI mapping being used (e.g., GM vs. Addictive Drums).
 
     Args:
         drum_map (Dict[int, str]): Dictionary mapping MIDI note numbers to drum names.
@@ -93,6 +105,7 @@ def get_note_groups(
         Tuple[Set[int], ...]: A tuple containing five sets of note numbers:
             (kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes).
     """
+    # Use sets for O(1) lookups when checking note membership later.
     kick_notes = set()
     snare_notes = set()
     hihat_notes = set()
@@ -100,6 +113,8 @@ def get_note_groups(
     cymbal_notes = set()
 
     for note, name in drum_map.items():
+        # Normalize to lowercase to ensure robust string matching against
+        # inconsistent naming conventions (e.g., "Kick", "kick", "Bass Drum").
         name_lower = name.lower()
         if "kick" in name_lower or "bass drum" in name_lower:
             kick_notes.add(note)
@@ -133,6 +148,9 @@ def get_absolute_times(track: mido.MidiTrack) -> List[Tuple[int, mido.Message]]:
     current_time = 0
 
     for msg in track:
+        # Accumulate delta times to reconstruct the absolute timeline.
+        # Global context is required for grid alignment and pattern detection,
+        # which cannot be easily done with relative delta times.
         current_time += msg.time
         messages.append((current_time, msg))
 
@@ -154,11 +172,16 @@ def convert_to_relative_times(
         List[Tuple[int, mido.Message]]: List of (delta_time, message) tuples,
             sorted by time.
     """
+    # Sort messages by absolute time to ensure positive delta times.
+    # MIDI events must be sequential; negative deltas would break the file structure.
     sorted_messages = sorted(messages, key=lambda x: x[0])
     relative_messages = []
     last_time = 0
 
     for abs_time, msg in sorted_messages:
+        # Calculate delta time relative to the previous event.
+        # This restores the standard MIDI file structure where events are defined
+        # by the time elapsed since the last event.
         relative_time = abs_time - last_time
         relative_messages.append((relative_time, msg))
         last_time = abs_time
@@ -186,19 +209,29 @@ def detect_fills(
     """
     logger.debug(f"Detecting fills with primary subdivision: {primary_subdivision}")
     fills = []
+    # Sort timestamps to process events chronologically, which is required
+    # to calculate time differences between successive events.
     times = sorted(notes_by_time.keys())
 
     for i in range(len(times) - 1):
         curr_time = times[i]
         next_time = times[i + 1]
+        # Filter for note messages to ignore metadata events (like CC or text),
+        # which shouldn't contribute to density calculations.
         notes_at_curr = [msg.note for msg in notes_by_time[curr_time] if hasattr(msg, "note")]
 
-        # Check for multiple toms in short succession
+        # Check for multiple toms in short succession.
+        # Heuristic: High density of tom hits usually signals a departure from the main groove.
+        # We use 'primary_subdivision' as the threshold for 'rapid' to distinguish fills
+        # from standard syncopated beats.
         if (
             any(note in tom_notes for note in notes_at_curr)
             and next_time - curr_time < primary_subdivision
         ):
-            # Mark region as potential fill
+            # Mark region as potential fill.
+            # We expand the window backwards (*2) to catch 'pickup' notes or lead-ins.
+            # We expand forwards (*8) to capture the resolution (often a crash on the next downbeat).
+            # This ensures the entire musical phrase is treated as a unit for processing.
             fill_start = max(0, curr_time - primary_subdivision * 2)
             fill_end = min(curr_time + primary_subdivision * 8, times[-1] if times else 0)
             fills.append((fill_start, fill_end))
@@ -217,16 +250,19 @@ def merge_overlapping_fills(fills: List[Tuple[int, int]]) -> List[Tuple[int, int
         List[Tuple[int, int]]: A sorted list of merged time ranges.
     """
     if not fills:
+        # No fills to merge, return empty list immediately.
         return []
 
-    # Sort by start time
+    # Sort by start time to allow for a single-pass linear merge algorithm.
     sorted_fills = sorted(fills, key=lambda x: x[0])
     merged = []
 
     for fill in sorted_fills:
+        # If no overlap with the previous region, start a new block
         if not merged or fill[0] > merged[-1][1]:
             merged.append(fill)
         else:
+            # Overlap detected: extend the previous block to cover this one
             merged[-1] = (merged[-1][0], max(merged[-1][1], fill[1]))
 
     return merged
