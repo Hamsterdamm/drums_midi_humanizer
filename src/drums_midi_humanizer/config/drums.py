@@ -8,7 +8,7 @@ drum humanizer. It includes:
 """
 
 from dataclasses import dataclass
-from typing import Dict, Any, Set, Tuple, List
+from typing import Dict, Set, Tuple
 
 
 @dataclass

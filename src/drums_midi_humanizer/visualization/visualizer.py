@@ -6,10 +6,11 @@ creating comprehensive plots using `mido` messages, and standalone functions
 for simpler tuple-based data structures.
 """
 
-from typing import List, Tuple, Dict
+from typing import Dict, List, Tuple
+
 import matplotlib.pyplot as plt
-import numpy as np
 import mido
+import numpy as np
 
 
 class DrumVisualizer:

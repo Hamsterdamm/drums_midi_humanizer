@@ -4,14 +4,14 @@ This module contains the main logic for processing MIDI drum tracks, applying
 timing and velocity variations based on drummer profiles and configuration settings.
 """
 
-from dataclasses import dataclass
-from typing import Dict, List, Tuple, Set
 import random
-import mido
-from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Dict, List, Tuple
 
-from ..config.drums import get_drum_map, DrummerProfile, DRUM_RUDIMENTS
+import mido
+
+from ..config.drums import DRUM_RUDIMENTS, DrummerProfile, get_drum_map
 from ..utils.midi import calculate_measure_position, detect_rudiment_pattern
 from ..visualization.visualizer import create_drum_visualization
 

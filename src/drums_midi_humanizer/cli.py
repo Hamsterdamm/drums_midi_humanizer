@@ -9,8 +9,8 @@ parameters such as timing, velocity, and drummer style.
 import argparse
 from pathlib import Path
 
-from .core.humanizer import DrumHumanizer, HumanizerConfig
 from .config.drums import DRUMMER_PROFILES
+from .core.humanizer import DrumHumanizer, HumanizerConfig
 
 
 def _valid_probability(arg: str) -> float:
