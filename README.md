@@ -71,7 +71,7 @@ python humanize-drums.py "input.mid" -o "output.mid" --style tight --timing 8 --
 -   `-a, --accent`: The probability of accenting a note (0.0 to 1.0). (Default: 0.2)
 -   `-s, --shuffle`: The amount of shuffle/swing to apply (0.0 to 0.5). (Default: 0.0)
 -   `-f, --flams`: The probability of adding a flam to a snare hit (0.0 to 1.0). (Default: 0.0)
--   `--style`: The drummer style profile to use. Available styles: `balanced`, `tight`, `loose`, `powerful`, `technical`, `lazy`. (Default: `balanced`)
+-   `--style`: The drummer style profile to use. Available styles: `balanced`, `jazzy`, `rock`, `precise`, `loose`, `modern_metal`. (Default: `balanced`)
 -   `--library`: The drum library mapping to use. (Default: `gm`)
 -   `--visualize`: Generate a PNG image comparing the original and humanized MIDI.
 
@@ -100,6 +100,70 @@ This will create `rock_beat_human.mid` and `rock_beat_human.png`.
 ## How It Works
 
 The script parses the input MIDI file and iterates through the drum notes. For each note, it applies a series of transformations based on the selected drummer profile and other parameters. It then reconstructs the MIDI track with the new, humanized timing and velocity information, ensuring that all other MIDI messages (like tempo changes) are preserved.
+
+## Project Architecture
+
+The following UML diagram describes the relationships between the core entities in the project:
+
+```mermaid
+classDiagram
+    class HumanizerConfig {
+        +int timing_variation
+        +int velocity_variation
+        +float ghost_note_prob
+        +float accent_prob
+        +float shuffle_amount
+        +float flamming_prob
+        +str drummer_style
+        +str drum_library
+        +bool visualize
+    }
+
+    class DrummerProfile {
+        +float timing_bias
+        +float velocity_emphasis
+        +float ghost_multiplier
+        +float kick_timing_tightness
+        +float hihat_variation
+        +float rushing_factor
+        +float groove_consistency
+        +float rudiment_sensitivity
+    }
+
+    class DrumMap {
+        +set kick_notes
+        +set snare_notes
+        +set hihat_notes
+        +set tom_notes
+        +set cymbal_notes
+        +get_note_groups()
+    }
+
+    class DrumHumanizer {
+        +HumanizerConfig config
+        +DrummerProfile profile
+        +DrumMap drum_map
+        +process_file(input_file, output_file)
+        +humanize_timings(...)
+        +humanize_velocity(...)
+    }
+
+    class DrumVisualizer {
+        +create_comparison_plot(...)
+    }
+
+    class CLI {
+        +parse_args()
+        +main()
+    }
+
+    CLI --> DrumHumanizer : creates
+    CLI --> HumanizerConfig : creates
+    DrumHumanizer --> HumanizerConfig : uses
+    DrumHumanizer --> DrummerProfile : uses
+    DrumHumanizer --> DrumMap : uses
+    DrumHumanizer ..> DrumVisualizer : uses
+```
 
 ## Contributing
 
