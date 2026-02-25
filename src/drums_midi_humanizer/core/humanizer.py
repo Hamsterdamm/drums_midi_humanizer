@@ -4,6 +4,7 @@ This module contains the main logic for processing MIDI drum tracks, applying
 timing and velocity variations based on drummer profiles and configuration settings.
 """
 
+import logging
 import random
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +15,8 @@ import mido
 from ..config.drums import DRUM_RUDIMENTS, DrummerProfile, get_drum_map
 from ..utils.midi import calculate_measure_position, detect_rudiment_pattern
 from ..visualization.visualizer import create_drum_visualization
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -75,7 +78,9 @@ class DrumHumanizer:
         """
         self.config = config
         self.profile = self._get_drummer_profile()
+        logger.debug(f"Loaded drummer profile '{config.drummer_style}': {self.profile}")
         self.drum_map = get_drum_map(config.drum_library)
+        logger.debug(f"Loaded drum map for library '{config.drum_library}'")
         self.KICK_NOTES, self.SNARE_NOTES, self.HIHAT_NOTES, self.TOM_NOTES, self.CYMBAL_NOTES = (
             self.drum_map.get_note_groups()
         )
@@ -124,14 +129,15 @@ class DrumHumanizer:
             input_path = Path(input_file)
             output_file = str(input_path.parent / f"{input_path.stem}_humanized{input_path.suffix}")
 
-        print(f"Loading MIDI file: {input_file}")
+        logger.info(f"Loading MIDI file: {input_file}")
         try:
             midi_file = mido.MidiFile(input_file)
         except Exception as e:
-            print(f"Error loading MIDI file: {e}")
+            logger.error(f"Error loading MIDI file: {e}")
             return
 
         self.ticks_per_beat = midi_file.ticks_per_beat
+        logger.info(f"MIDI file loaded. Ticks per beat: {self.ticks_per_beat}, Tracks: {len(midi_file.tracks)}")
         humanized_midi = mido.MidiFile()
         humanized_midi.ticks_per_beat = midi_file.ticks_per_beat
 
@@ -139,11 +145,12 @@ class DrumHumanizer:
         humanized_messages = []
 
         for track in midi_file.tracks:
-            print(f"\nProcessing track {midi_file.tracks.index(track) + 1}/{len(midi_file.tracks)}")
+            logger.info(f"Processing track {midi_file.tracks.index(track) + 1}/{len(midi_file.tracks)}")
 
             absolute_time = 0
             # This list will hold message objects with their absolute time
             events_with_absolute_time = []
+            notes_processed_count = 0
 
             # First pass: Apply humanization and store events with their new absolute times
             for msg in track:
@@ -151,6 +158,7 @@ class DrumHumanizer:
 
                 if msg.type == "note_on" and msg.velocity > 0:
                     measure_pos = self._get_measure_position(absolute_time)
+                    notes_processed_count += 1
                     original_messages.append((absolute_time, msg.note, msg.velocity))
 
                     new_time = self._apply_timing_variation(absolute_time, msg.note)
@@ -178,6 +186,8 @@ class DrumHumanizer:
                 elif msg.type != "note_off":  # Keep all other messages, discard original note_offs
                     events_with_absolute_time.append({"time": absolute_time, "msg": msg})
 
+            logger.info(f"Track {midi_file.tracks.index(track) + 1}: Processed {notes_processed_count} notes.")
+
             # Sort all events by their absolute time
             events_with_absolute_time.sort(key=lambda e: e["time"])
 
@@ -195,12 +205,12 @@ class DrumHumanizer:
 
         # Save the humanized MIDI file
         humanized_midi.save(output_file)
-        print(f"\nSaved humanized MIDI to: {output_file}")
+        logger.info(f"Saved humanized MIDI to: {output_file}")
 
         # Generate visualization if requested
         if self.config.visualize:
             visualization_file = output_file.rsplit(".", 1)[0] + ".png"
-            print(f"Generating visualization: {visualization_file}")
+            logger.info(f"Generating visualization: {visualization_file}")
             create_drum_visualization(original_messages, humanized_messages, visualization_file)
 
     def humanize_timings(
@@ -532,6 +542,7 @@ class DrumHumanizer:
             if detect_rudiment_pattern(
                 notes, rudiment["pattern"], rudiment["timing_ratio"], self.ticks_per_beat
             ):
+                logger.debug(f"Detected rudiment pattern: {rudiment_name}")
                 # Apply rudiment-specific timing and velocity adjustments
                 result = []
                 pattern_duration = rudiment["duration"] * self.ticks_per_beat

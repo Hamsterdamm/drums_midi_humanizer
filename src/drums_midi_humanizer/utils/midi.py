@@ -6,9 +6,12 @@ These utilities support the core humanization logic by abstracting common
 MIDI operations.
 """
 
+import logging
 from typing import Dict, List, Set, Tuple
 
 import mido
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_measure_position(
@@ -181,6 +184,7 @@ def detect_fills(
         List[Tuple[int, int]]: A list of (start_time, end_time) tuples defining
             the detected fill regions.
     """
+    logger.debug(f"Detecting fills with primary subdivision: {primary_subdivision}")
     fills = []
     times = sorted(notes_by_time.keys())
 
@@ -199,6 +203,7 @@ def detect_fills(
             fill_end = min(curr_time + primary_subdivision * 8, times[-1] if times else 0)
             fills.append((fill_start, fill_end))
 
+    logger.debug(f"Found {len(fills)} potential fill regions before merging.")
     return merge_overlapping_fills(fills)
 
 

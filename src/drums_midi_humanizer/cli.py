@@ -7,6 +7,7 @@ parameters such as timing, velocity, and drummer style.
 """
 
 import argparse
+import logging
 from pathlib import Path
 
 from .config.drums import DRUMMER_PROFILES
@@ -128,11 +129,18 @@ def main() -> None:
     3. Initializes the configuration and humanizer.
     4. Processes the MIDI file and optionally generates a visualization.
     """
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+    logger = logging.getLogger(__name__)
+
     args = parse_args()
+    logger.debug(f"Arguments parsed: {args}")
 
     # Validate input file existence
     if not Path(args.input_file).exists():
-        print(f"Error: Input file not found: {args.input_file}")
+        logger.error(f"Input file not found: {args.input_file}")
         return
 
     # Create humanizer configuration object from arguments
@@ -147,6 +155,7 @@ def main() -> None:
         drum_library=args.library,
         visualize=args.visualize,
     )
+    logger.info(f"Humanizer configuration initialized: {config}")
 
     # Initialize the humanizer with the config and process the file
     humanizer = DrumHumanizer(config)
