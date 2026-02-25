@@ -12,13 +12,12 @@ from typing import Dict, List, Tuple
 
 import mido
 
-from ..config.drums import DRUM_RUDIMENTS, DrummerProfile, get_drum_map
+from ..config.drums import DrummerProfile, get_drum_map
 from ..utils.midi import (
     calculate_measure_position,
     convert_to_relative_times,
-    detect_rudiment_pattern,
+    detect_fills,
     get_absolute_times,
-    get_note_groups,
 )
 from ..visualization.visualizer import create_drum_visualization
 
@@ -93,7 +92,7 @@ class DrumHumanizer:
             self.HIHAT_NOTES,
             self.TOM_NOTES,
             self.CYMBAL_NOTES,
-        ) = get_note_groups(self.drum_map)
+        ) = self.drum_map.get_note_groups()
         self.ticks_per_beat = 0
         self.time_sig_numerator = 4
         self.time_sig_denominator = 4
@@ -188,6 +187,18 @@ class DrumHumanizer:
         """
         events_with_absolute_time = get_absolute_times(track)
 
+        # Build context: notes by time
+        notes_by_time = {}
+        for time, msg in events_with_absolute_time:
+            if msg.type == "note_on" and msg.velocity > 0:
+                if time not in notes_by_time:
+                    notes_by_time[time] = []
+                notes_by_time[time].append(msg)
+
+        # Detect fills
+        primary_subdivision = self.ticks_per_beat // 4
+        self.merged_fills = detect_fills(notes_by_time, primary_subdivision, self.TOM_NOTES)
+
         processed_events = []
         original_messages = []
         humanized_messages = []
@@ -199,8 +210,18 @@ class DrumHumanizer:
                 original_messages.append((time, msg.note, msg.velocity))
 
                 measure_pos = self._get_measure_position(time)
-                new_time = self._apply_timing_variation(time, msg.note)
-                new_velocity = self._apply_velocity_variation(msg.velocity, msg.note, measure_pos)
+                measure_duration = self.ticks_per_beat * self.time_sig_numerator
+                measure_idx = int(time / measure_duration) if measure_duration > 0 else 0
+                in_fill = any(start <= time <= end for start, end in self.merged_fills)
+
+                # Apply advanced humanization logic
+                timing_offset = self.humanize_timings(
+                    msg, time, notes_by_time, in_fill, False, None, measure_pos
+                )
+                new_time = max(0, time + timing_offset)
+                new_velocity = self.humanize_velocity(
+                    msg, time, in_fill, measure_pos, measure_idx
+                )
 
                 processed_events.append(
                     (new_time, mido.Message("note_on", note=msg.note, velocity=new_velocity))
@@ -462,112 +483,6 @@ class DrumHumanizer:
     def _has_kick_or_snare_at_time(self, notes_by_time: Dict, time: int) -> bool:
         """Check if a kick or snare occurs at the specified time."""
         other_drums = notes_by_time.get(time, [])
-        return any(n in self.KICK_NOTES or n in self.SNARE_NOTES for n in other_drums)
-
-    def _apply_timing_variation(self, time: int, note: int) -> int:
-        """Apply timing variation based on note type and drummer profile.
-
-        This is the primary timing logic used by `process_file`.
-
-        Args:
-            time (int): The original absolute timestamp.
-            note (int): The MIDI note number.
-
-        Returns:
-            int: The new absolute timestamp with humanization applied.
-        """
-        measure_pos = self._get_measure_position(time)
-
-        # Base variation based on groove consistency
-        base_variation = random.gauss(
-            0, self.current_timing_variation * (2 - self.profile.groove_consistency)
+        return any(
+            msg.note in self.KICK_NOTES or msg.note in self.SNARE_NOTES for msg in other_drums
         )
-
-        # Add drummer-specific timing bias
-        if note in self.KICK_NOTES:
-            variation = base_variation * (1 / self.profile.kick_timing_tightness)
-        elif note in self.HIHAT_NOTES:
-            variation = base_variation * self.profile.hihat_variation
-        else:
-            variation = base_variation
-
-        # Apply rushing/dragging tendency based on measure position
-        rush_amount = self.profile.rushing_factor * measure_pos * self.ticks_per_beat / 8
-
-        # Apply shuffle feel on relevant subdivisions
-        if measure_pos % 0.5 < 0.25:  # Second 8th note of each beat
-            shuffle = self.config.shuffle_amount * self.ticks_per_beat / 12
-        else:
-            shuffle = 0
-
-        return int(time + variation + rush_amount + shuffle)
-
-    def _apply_velocity_variation(self, velocity: int, note: int, measure_pos: float) -> int:
-        """Apply velocity variation based on note type and drummer profile.
-
-        This is the primary velocity logic used by `process_file`.
-
-        Args:
-            velocity (int): The original velocity.
-            note (int): The MIDI note number.
-            measure_pos (float): The position within the measure.
-
-        Returns:
-            int: The new velocity value.
-        """
-        if note in self.KICK_NOTES or note in self.SNARE_NOTES:
-            # Emphasize strong beats
-            emphasis = 1.0 + (0.2 * self.profile.velocity_emphasis * (1 - (measure_pos % 1)))
-            if random.random() < self.config.accent_prob:
-                emphasis *= 1.2
-        elif note in self.HIHAT_NOTES:
-            # Lighter variation for hi-hats
-            emphasis = 1.0 + random.gauss(0, 0.1) * self.profile.hihat_variation
-        else:
-            emphasis = 1.0
-
-        # Apply ghost notes
-        if note in self.SNARE_NOTES and random.random() < self.config.ghost_note_prob:
-            emphasis *= self.profile.ghost_multiplier
-
-        new_velocity = int(velocity * emphasis)
-        return max(1, min(127, new_velocity))
-
-    def _detect_and_apply_rudiments(
-        self, notes: List[Tuple[int, int, int]]
-    ) -> List[Tuple[int, int, int]]:
-        """Detect and apply humanization to drum rudiments.
-
-        Scans a sequence of notes for known rudiment patterns and applies specific
-        timing and velocity curves if matches are found.
-
-        Args:
-            notes (List[Tuple[int, int, int]]): List of (time, note, velocity) tuples.
-
-        Returns:
-            List[Tuple[int, int, int]]: The processed list of notes.
-        """
-        if len(notes) < 2:
-            return notes
-
-        for rudiment_name, rudiment in DRUM_RUDIMENTS.items():
-            if detect_rudiment_pattern(
-                notes, rudiment["pattern"], rudiment["timing_ratio"], self.ticks_per_beat
-            ):
-                logger.debug(f"Detected rudiment pattern: {rudiment_name}")
-                # Apply rudiment-specific timing and velocity adjustments
-                result = []
-                pattern_duration = rudiment["duration"] * self.ticks_per_beat
-                start_time = notes[0][0]
-
-                for i, (time, note, vel) in enumerate(notes):
-                    rel_pos = i / len(notes)
-                    adj_time = start_time + int(
-                        rel_pos * pattern_duration * rudiment["timing_ratio"][i]
-                    )
-                    adj_vel = int(vel * rudiment["velocity_ratio"][i])
-                    result.append((adj_time, note, adj_vel))
-
-                return result
-
-        return notes
