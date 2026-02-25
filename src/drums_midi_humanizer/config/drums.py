@@ -10,6 +10,7 @@ drum humanizer. It includes:
 from dataclasses import dataclass
 from typing import Dict, Any, Set, Tuple, List
 
+
 @dataclass
 class DrummerProfile:
     """Profile defining a drummer's playing characteristics.
@@ -24,6 +25,7 @@ class DrummerProfile:
         groove_consistency (float): How consistent the timing variations are (0.0-1.0).
         rudiment_sensitivity (float): Probability threshold for applying rudiment logic (0.0-1.0).
     """
+
     timing_bias: float
     velocity_emphasis: float
     ghost_multiplier: float
@@ -32,6 +34,7 @@ class DrummerProfile:
     rushing_factor: float
     groove_consistency: float
     rudiment_sensitivity: float = 0.7  # How likely to detect and apply rudiments (0.0-1.0)
+
 
 @dataclass
 class DrumMap:
@@ -44,6 +47,7 @@ class DrumMap:
         tom_notes (set[int]): MIDI note numbers for toms.
         cymbal_notes (set[int]): MIDI note numbers for cymbals (crash, ride, splash, china).
     """
+
     kick_notes: set[int]
     snare_notes: set[int]
     hihat_notes: set[int]
@@ -52,7 +56,7 @@ class DrumMap:
 
     def get_note_groups(self) -> Tuple[Set[int], Set[int], Set[int], Set[int], Set[int]]:
         """Get all note groups as a tuple of sets.
-        
+
         Returns:
             Tuple[Set[int], ...]: A tuple containing sets of note numbers for:
                 (kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes).
@@ -62,8 +66,9 @@ class DrumMap:
             self.snare_notes,
             self.hihat_notes,
             self.tom_notes,
-            self.cymbal_notes
+            self.cymbal_notes,
         )
+
 
 # Drum maps for different libraries.
 # Keys represent the library identifier used in the CLI.
@@ -73,43 +78,43 @@ DRUM_MAPS = {
         snare_notes={38, 40},  # Acoustic Snare, Electric Snare
         hihat_notes={42, 44, 46},  # Closed HH, Pedal HH, Open HH
         tom_notes={41, 43, 45, 47, 48, 50},  # Low/Mid/High Floor/Tom
-        cymbal_notes={49, 51, 52, 53, 55, 57, 59}  # Crash/Ride cymbals
+        cymbal_notes={49, 51, 52, 53, 55, 57, 59},  # Crash/Ride cymbals
     ),
     "ad2": DrumMap(  # Addictive Drums 2
         kick_notes={36},
         snare_notes={38, 40},
         hihat_notes={42, 44, 46, 54},  # Including extra articulations
         tom_notes={41, 43, 45, 47, 48, 50},
-        cymbal_notes={49, 51, 52, 53, 55, 57, 59, 56}  # Including extra crashes
+        cymbal_notes={49, 51, 52, 53, 55, 57, 59, 56},  # Including extra crashes
     ),
     "sd3": DrumMap(  # Superior Drummer 3
         kick_notes={35, 36},
         snare_notes={38, 40, 37},  # Including rim shots
         hihat_notes={42, 44, 46, 54, 56},  # More hihat articulations
         tom_notes={41, 43, 45, 47, 48, 50},
-        cymbal_notes={49, 51, 52, 53, 55, 57, 59, 56, 58}  # More cymbal options
+        cymbal_notes={49, 51, 52, 53, 55, 57, 59, 56, 58},  # More cymbal options
     ),
     "ez2": DrumMap(  # EZdrummer 2
         kick_notes={35, 36},
         snare_notes={38, 40, 37},
         hihat_notes={42, 44, 46, 54},
         tom_notes={41, 43, 45, 47, 48, 50},
-        cymbal_notes={49, 51, 52, 53, 55, 57, 59}
+        cymbal_notes={49, 51, 52, 53, 55, 57, 59},
     ),
     "ssd5": DrumMap(  # Steven Slate Drums 5
         kick_notes={35, 36},
         snare_notes={38, 40, 37, 39},  # Including additional articulations
         hihat_notes={42, 44, 46, 54, 56},
         tom_notes={41, 43, 45, 47, 48, 50},
-        cymbal_notes={49, 51, 52, 53, 55, 57, 59, 56, 58}
+        cymbal_notes={49, 51, 52, 53, 55, 57, 59, 56, 58},
     ),
     "mtpk2": DrumMap(  # MT Power Kit 2
         kick_notes={36},
         snare_notes={38, 40},
         hihat_notes={42, 44, 46},
         tom_notes={41, 43, 45, 47},
-        cymbal_notes={49, 51, 52, 53, 55}
-    )
+        cymbal_notes={49, 51, 52, 53, 55},
+    ),
 }
 
 # Drummer style profiles.
@@ -216,18 +221,21 @@ DRUM_RUDIMENTS = {
     },
 }
 
+
 def get_drum_map(library: str = "gm") -> DrumMap:
     """Retrieve the drum map for a specific library.
-    
+
     Args:
         library (str): The name of the drum library to use. Defaults to "gm" (General MIDI).
-        
+
     Returns:
         DrumMap: A DrumMap object containing the note mappings for the specified library.
-        
+
     Raises:
         ValueError: If the specified library is not found.
     """
     if library not in DRUM_MAPS:
-        raise ValueError(f"Unknown drum library: {library}. Available libraries: {list(DRUM_MAPS.keys())}")
+        raise ValueError(
+            f"Unknown drum library: {library}. Available libraries: {list(DRUM_MAPS.keys())}"
+        )
     return DRUM_MAPS[library]

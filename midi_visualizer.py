@@ -40,9 +40,7 @@ def create_comparison_plot(original_messages, humanized_messages, output_path=No
         return "other"
 
     # Plot note events
-    for i, (messages, alpha) in enumerate(
-        [(original_messages, 0.5), (humanized_messages, 1.0)]
-    ):
+    for i, (messages, alpha) in enumerate([(original_messages, 0.5), (humanized_messages, 1.0)]):
         times = []
         notes = []
         velocities = []
@@ -59,9 +57,7 @@ def create_comparison_plot(original_messages, humanized_messages, output_path=No
 
         # Plot notes
         if times:  # Only plot if we have data
-            ax1.scatter(
-                times, notes, c=colors_list, alpha=alpha, s=velocities, marker="o"
-            )
+            ax1.scatter(times, notes, c=colors_list, alpha=alpha, s=velocities, marker="o")
 
     # Customize the note plot
     ax1.set_ylabel("MIDI Note")
@@ -71,9 +67,7 @@ def create_comparison_plot(original_messages, humanized_messages, output_path=No
     # Plot velocity distribution
     def plot_velocities(ax, messages, label, alpha=1.0):
         velocities = [
-            msg.velocity
-            for _, msg in messages
-            if msg.type == "note_on" and msg.velocity > 0
+            msg.velocity for _, msg in messages if msg.type == "note_on" and msg.velocity > 0
         ]
         if velocities:
             ax.hist(velocities, bins=30, alpha=alpha, label=label, color="#44FF44")
@@ -87,9 +81,7 @@ def create_comparison_plot(original_messages, humanized_messages, output_path=No
 
     # Plot timing variations
     def plot_timing_variations(ax, messages, label, alpha=1.0):
-        times = [
-            time for time, msg in messages if msg.type == "note_on" and msg.velocity > 0
-        ]
+        times = [time for time, msg in messages if msg.type == "note_on" and msg.velocity > 0]
         if len(times) > 1:
             intervals = np.diff(times)
             ax.hist(intervals, bins=30, alpha=alpha, label=label, color="#4444FF")

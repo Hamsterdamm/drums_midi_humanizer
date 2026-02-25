@@ -10,7 +10,9 @@ from typing import Dict, List, Set, Tuple
 import mido
 
 
-def calculate_measure_position(time: int, ticks_per_beat: int, time_sig_numerator: int = 4) -> float:
+def calculate_measure_position(
+    time: int, ticks_per_beat: int, time_sig_numerator: int = 4
+) -> float:
     """Calculate the beat position within a measure.
 
     Determines where a specific timestamp falls within a measure, expressed
@@ -29,8 +31,13 @@ def calculate_measure_position(time: int, ticks_per_beat: int, time_sig_numerato
     return beats % time_sig_numerator
 
 
-def detect_rudiment_pattern(notes: List[Tuple[int, int, int]], pattern: List[str], timing_ratios: List[float], 
-                          ticks_per_beat: int, tolerance: float = 0.1) -> bool:
+def detect_rudiment_pattern(
+    notes: List[Tuple[int, int, int]],
+    pattern: List[str],
+    timing_ratios: List[float],
+    ticks_per_beat: int,
+    tolerance: float = 0.1,
+) -> bool:
     """Check if a sequence of notes matches a specific rudiment pattern.
 
     Analyzes a sequence of notes to see if their relative timing matches
@@ -66,7 +73,9 @@ def detect_rudiment_pattern(notes: List[Tuple[int, int, int]], pattern: List[str
     return True
 
 
-def get_note_groups(drum_map: Dict[int, str]) -> Tuple[Set[int], Set[int], Set[int], Set[int], Set[int]]:
+def get_note_groups(
+    drum_map: Dict[int, str],
+) -> Tuple[Set[int], Set[int], Set[int], Set[int], Set[int]]:
     """Group drum notes by instrument category based on their names.
 
     Parses the drum map names to categorize MIDI note numbers into Kicks,
@@ -127,7 +136,7 @@ def get_absolute_times(track: mido.MidiTrack) -> List[Tuple[int, mido.Message]]:
 
 
 def convert_to_relative_times(
-    messages: List[Tuple[int, mido.Message]]
+    messages: List[Tuple[int, mido.Message]],
 ) -> List[Tuple[int, mido.Message]]:
     """Convert absolute timestamps back to relative delta times for MIDI export.
 
@@ -154,9 +163,7 @@ def convert_to_relative_times(
 
 
 def detect_fills(
-    notes_by_time: Dict[int, List[mido.Message]],
-    primary_subdivision: int,
-    tom_notes: Set[int]
+    notes_by_time: Dict[int, List[mido.Message]], primary_subdivision: int, tom_notes: Set[int]
 ) -> List[Tuple[int, int]]:
     """Detect potential drum fill sections based on tom activity.
 
@@ -179,8 +186,7 @@ def detect_fills(
     for i in range(len(times) - 1):
         curr_time = times[i]
         next_time = times[i + 1]
-        notes_at_curr = [msg.note for msg in notes_by_time[curr_time] 
-                        if hasattr(msg, 'note')]
+        notes_at_curr = [msg.note for msg in notes_by_time[curr_time] if hasattr(msg, "note")]
 
         # Check for multiple toms in short succession
         if (
@@ -189,10 +195,7 @@ def detect_fills(
         ):
             # Mark region as potential fill
             fill_start = max(0, curr_time - primary_subdivision * 2)
-            fill_end = min(
-                curr_time + primary_subdivision * 8,
-                times[-1] if times else 0
-            )
+            fill_end = min(curr_time + primary_subdivision * 8, times[-1] if times else 0)
             fills.append((fill_start, fill_end))
 
     return merge_overlapping_fills(fills)
@@ -213,7 +216,7 @@ def merge_overlapping_fills(fills: List[Tuple[int, int]]) -> List[Tuple[int, int
     # Sort by start time
     sorted_fills = sorted(fills, key=lambda x: x[0])
     merged = []
-    
+
     for fill in sorted_fills:
         if not merged or fill[0] > merged[-1][1]:
             merged.append(fill)

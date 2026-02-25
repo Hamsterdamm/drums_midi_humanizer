@@ -59,59 +59,62 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         description="Humanize MIDI drum tracks with realistic drummer feel",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("input_file", help="Input MIDI file path")
     parser.add_argument(
-        "--output", "-o",
-        help="Output MIDI file path (default: input_file_humanized.mid)"
+        "--output", "-o", help="Output MIDI file path (default: input_file_humanized.mid)"
     )
     parser.add_argument(
         "--style",
         choices=list(DRUMMER_PROFILES.keys()),
         default="balanced",
-        help="Drummer style profile (default: balanced)"
+        help="Drummer style profile (default: balanced)",
     )
     parser.add_argument(
         "--library",
         choices=["gm", "ad2", "sd3", "ez2", "ssd5", "mtpk2"],
         default="gm",
-        help="Drums library mapping (default: gm)"
+        help="Drums library mapping (default: gm)",
     )
     parser.add_argument(
         "--visualize",
         action="store_true",
-        help="Generate visualization comparing original and humanized MIDI"
+        help="Generate visualization comparing original and humanized MIDI",
     )
     parser.add_argument(
-        "--timing", "-t",
-        type=int, default=10,
-        help="Timing variation in ticks (default: 10)"
+        "--timing", "-t", type=int, default=10, help="Timing variation in ticks (default: 10)"
     )
     parser.add_argument(
-        "--velocity", "-v",
-        type=int, default=15,
-        help="Velocity variation (default: 15)"
+        "--velocity", "-v", type=int, default=15, help="Velocity variation (default: 15)"
     )
     parser.add_argument(
-        "--ghost", "-g",
-        type=_valid_probability, default=0.1,
-        help="Ghost note probability (default: 0.1)"
+        "--ghost",
+        "-g",
+        type=_valid_probability,
+        default=0.1,
+        help="Ghost note probability (default: 0.1)",
     )
     parser.add_argument(
-        "--accent", "-a",
-        type=_valid_probability, default=0.2,
-        help="Accent probability (default: 0.2)"
+        "--accent",
+        "-a",
+        type=_valid_probability,
+        default=0.2,
+        help="Accent probability (default: 0.2)",
     )
     parser.add_argument(
-        "--shuffle", "-s",
-        type=_valid_shuffle, default=0.0,
-        help="Shuffle amount, 0.0-0.5 (default: 0.0)"
+        "--shuffle",
+        "-s",
+        type=_valid_shuffle,
+        default=0.0,
+        help="Shuffle amount, 0.0-0.5 (default: 0.0)",
     )
     parser.add_argument(
-        "--flams", "-f",
-        type=_valid_probability, default=0.0,
-        help="Flam probability (default: 0.0)"
+        "--flams",
+        "-f",
+        type=_valid_probability,
+        default=0.0,
+        help="Flam probability (default: 0.0)",
     )
     return parser.parse_args()
 
@@ -142,7 +145,7 @@ def main() -> None:
         flamming_prob=args.flams,
         drummer_style=args.style,
         drum_library=args.library,
-        visualize=args.visualize
+        visualize=args.visualize,
     )
 
     # Initialize the humanizer with the config and process the file

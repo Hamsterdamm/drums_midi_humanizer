@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import mido
 
+
 class DrumVisualizer:
     """Class for creating visualizations of MIDI drum patterns.
 
@@ -24,18 +25,24 @@ class DrumVisualizer:
         self.drum_categories = {
             "Kicks": {"notes": (35, 36), "color": "#FF4444"},
             "Snares": {"notes": (37, 38, 39, 40), "color": "#44FF44"},
-            "Hi-hats": {"notes": (42, 44, 46, 54, 56), "color": "#4444FF"},  # Added closed/open variations
+            "Hi-hats": {
+                "notes": (42, 44, 46, 54, 56),
+                "color": "#4444FF",
+            },  # Added closed/open variations
             "Toms": {"notes": (41, 43, 45, 47, 48, 50), "color": "#FF44FF"},
-            "Cymbals": {"notes": (49, 51, 52, 53, 55, 57, 59, 56, 58), "color": "#FFFF44"},  # Added all cymbal types
+            "Cymbals": {
+                "notes": (49, 51, 52, 53, 55, 57, 59, 56, 58),
+                "color": "#FFFF44",
+            },  # Added all cymbal types
         }
         self.analysis_window = 16  # Analysis window in beats for timing variations
-        
+
     def create_comparison_plot(
         self,
         original_messages: List[Tuple[int, mido.Message]],
         humanized_messages: List[Tuple[int, mido.Message]],
         output_path: str,
-        ticks_per_beat: int = 480
+        ticks_per_beat: int = 480,
     ) -> bool:
         """Create a detailed visualization comparing original and humanized MIDI drum patterns.
 
@@ -54,7 +61,7 @@ class DrumVisualizer:
             plt.style.use("dark_background")
             fig = plt.figure(figsize=(15, 15))
             gs = plt.GridSpec(5, 1, height_ratios=[5, 5, 3, 3, 1], hspace=0.4)
-            
+
             # Create subplots
             ax_orig = plt.subplot(gs[0])
             ax_human = plt.subplot(gs[1])
@@ -71,21 +78,14 @@ class DrumVisualizer:
             # Plot patterns
             self._plot_notes(ax_orig, original_messages, alpha=0.8, title="Original Pattern")
             self._plot_notes(ax_human, humanized_messages, alpha=0.8, title="Humanized Pattern")
-            
+
             # Plot timing analysis
             self._plot_timing_analysis(
-                ax_timing, 
-                original_messages, 
-                humanized_messages, 
-                ticks_per_beat
+                ax_timing, original_messages, humanized_messages, ticks_per_beat
             )
-            
+
             # Plot velocity analysis
-            self._plot_velocity_analysis(
-                ax_velocity,
-                original_messages,
-                humanized_messages
-            )
+            self._plot_velocity_analysis(ax_velocity, original_messages, humanized_messages)
 
             # Handle legend
             self._setup_legend(ax_legend, [ax_orig, ax_human])
@@ -106,7 +106,7 @@ class DrumVisualizer:
         ax: plt.Axes,
         messages: List[Tuple[int, mido.Message]],
         alpha: float = 1.0,
-        title: str = ""
+        title: str = "",
     ) -> None:
         """Plot MIDI notes on the given axes with improved visualization.
 
@@ -126,7 +126,7 @@ class DrumVisualizer:
         # Plot grid for timing reference
         if times:
             grid_times = np.arange(min(times), max(times) + 1, 480)  # Grid every quarter note
-            ax.vlines(grid_times, 35, 60, color='gray', alpha=0.2, linestyle=':')
+            ax.vlines(grid_times, 35, 60, color="gray", alpha=0.2, linestyle=":")
 
         # Plot each category with enhanced styling
         for cat_name, cat_info in self.drum_categories.items():
@@ -142,14 +142,20 @@ class DrumVisualizer:
                     s=cat_vels,
                     c=cat_info["color"],
                     label=cat_name,
-                    edgecolors='white',
-                    linewidths=0.5
+                    edgecolors="white",
+                    linewidths=0.5,
                 )
-                
+
                 # Add velocity lines
                 for t, n, v in zip(cat_times, cat_notes, cat_vels):
-                    ax.vlines(t, n - 0.3, n + 0.3, color=cat_info["color"], 
-                            alpha=min(1.0, v/200), linewidth=1)
+                    ax.vlines(
+                        t,
+                        n - 0.3,
+                        n + 0.3,
+                        color=cat_info["color"],
+                        alpha=min(1.0, v / 200),
+                        linewidth=1,
+                    )
 
         ax.set_ylabel("MIDI Note")
         ax.set_title(title)
@@ -161,7 +167,7 @@ class DrumVisualizer:
         times: List[int],
         notes: List[int],
         velocities: List[int],
-        category_notes: Tuple[int, ...]
+        category_notes: Tuple[int, ...],
     ) -> Tuple[List[int], List[int], List[int]]:
         """Filter notes by category.
 
@@ -244,7 +250,7 @@ class DrumVisualizer:
         ax_legend.axis("off")
         handles = []
         labels = []
-        
+
         for ax in plot_axes:
             h, l = ax.get_legend_handles_labels()
             for hi, li in zip(h, l):
@@ -295,7 +301,7 @@ class DrumVisualizer:
         ax: plt.Axes,
         original_messages: List[Tuple[int, mido.Message]],
         humanized_messages: List[Tuple[int, mido.Message]],
-        ticks_per_beat: int
+        ticks_per_beat: int,
     ) -> None:
         """Plot timing variation analysis.
 
@@ -305,21 +311,22 @@ class DrumVisualizer:
             humanized_messages: List of humanized MIDI messages.
             ticks_per_beat: Resolution of the MIDI file.
         """
+
         def get_timing_variations(messages):
             times = np.array([t for t, m in messages if m.type == "note_on" and m.velocity > 0])
             if len(times) < 2:
                 return []
             intervals = np.diff(times)
-            return intervals - np.round(intervals / (ticks_per_beat/4)) * (ticks_per_beat/4)
-        
+            return intervals - np.round(intervals / (ticks_per_beat / 4)) * (ticks_per_beat / 4)
+
         orig_vars = get_timing_variations(original_messages)
         human_vars = get_timing_variations(humanized_messages)
-        
+
         if orig_vars.size > 0 and human_vars.size > 0:
             bins = np.linspace(-50, 50, 40)
             ax.hist(orig_vars, bins=bins, alpha=0.5, label="Original", color="#888888")
             ax.hist(human_vars, bins=bins, alpha=0.7, label="Humanized", color="#44FF44")
-            
+
             ax.set_xlabel("Timing Variation (ticks)")
             ax.set_ylabel("Count")
             ax.set_title("Timing Variations from Grid")
@@ -330,7 +337,7 @@ class DrumVisualizer:
         self,
         ax: plt.Axes,
         original_messages: List[Tuple[int, mido.Message]],
-        humanized_messages: List[Tuple[int, mido.Message]]
+        humanized_messages: List[Tuple[int, mido.Message]],
     ) -> None:
         """Plot velocity distribution analysis.
 
@@ -339,26 +346,30 @@ class DrumVisualizer:
             original_messages: List of original MIDI messages.
             humanized_messages: List of humanized MIDI messages.
         """
+
         def get_velocities(messages):
             return [m.velocity for _, m in messages if m.type == "note_on" and m.velocity > 0]
-            
+
         orig_vels = get_velocities(original_messages)
         human_vels = get_velocities(humanized_messages)
-        
+
         if orig_vels and human_vels:
             bins = np.linspace(0, 127, 40)
             ax.hist(orig_vels, bins=bins, alpha=0.5, label="Original", color="#888888")
             ax.hist(human_vels, bins=bins, alpha=0.7, label="Humanized", color="#44FF44")
-            
+
             ax.set_xlabel("Velocity")
             ax.set_ylabel("Count")
             ax.set_title("Velocity Distribution")
             ax.legend()
             ax.grid(True, alpha=0.2)
 
-def create_drum_visualization(original_messages: List[Tuple[int, int, int]],
-                            humanized_messages: List[Tuple[int, int, int]],
-                            output_png: str) -> None:
+
+def create_drum_visualization(
+    original_messages: List[Tuple[int, int, int]],
+    humanized_messages: List[Tuple[int, int, int]],
+    output_png: str,
+) -> None:
     """Create a detailed visualization comparing original and humanized MIDI drum patterns.
 
     This function uses a simpler input format (tuples of ints) compared to the class-based method.
@@ -379,7 +390,7 @@ def create_drum_visualization(original_messages: List[Tuple[int, int, int]],
         "Snares": list(range(37, 41)),
         "Hi-hats": list(range(42, 47)),
         "Toms": list(range(41, 51)),
-        "Cymbals": list(range(51, 60))
+        "Cymbals": list(range(51, 60)),
     }
 
     # Plot original notes
@@ -395,12 +406,13 @@ def create_drum_visualization(original_messages: List[Tuple[int, int, int]],
     _plot_velocity_differences(original_messages, humanized_messages, ax3)
 
     plt.tight_layout()
-    plt.savefig(output_png, dpi=300, bbox_inches='tight')
+    plt.savefig(output_png, dpi=300, bbox_inches="tight")
     plt.close()
 
 
-def _plot_drum_grid(messages: List[Tuple[int, int, int]], categories: dict,
-                   ax: plt.Axes, title: str) -> None:
+def _plot_drum_grid(
+    messages: List[Tuple[int, int, int]], categories: dict, ax: plt.Axes, title: str
+) -> None:
     """Plot a grid of drum hits colored by category and sized by velocity.
 
     Args:
@@ -410,7 +422,7 @@ def _plot_drum_grid(messages: List[Tuple[int, int, int]], categories: dict,
         title: Title for the plot.
     """
     colors = plt.cm.tab10(np.linspace(0, 1, len(categories)))
-    
+
     for i, (cat, notes) in enumerate(categories.items()):
         times, vels = [], []
         for t, n, v in messages:
@@ -418,19 +430,20 @@ def _plot_drum_grid(messages: List[Tuple[int, int, int]], categories: dict,
                 times.append(t)
                 vels.append(v)
         if times:  # Only plot if we have notes in this category
-            ax.scatter(times, [i] * len(times), s=np.array(vels) * 2,
-                      c=[colors[i]], alpha=0.6, label=cat)
+            ax.scatter(
+                times, [i] * len(times), s=np.array(vels) * 2, c=[colors[i]], alpha=0.6, label=cat
+            )
 
     ax.set_title(title)
     ax.set_yticks(range(len(categories)))
     ax.set_yticklabels(categories.keys())
     ax.grid(True, alpha=0.2)
-    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
 
 
-def _plot_velocity_differences(original: List[Tuple[int, int, int]],
-                             humanized: List[Tuple[int, int, int]],
-                             ax: plt.Axes) -> None:
+def _plot_velocity_differences(
+    original: List[Tuple[int, int, int]], humanized: List[Tuple[int, int, int]], ax: plt.Axes
+) -> None:
     """Plot the velocity differences between original and humanized notes.
 
     Args:
@@ -440,7 +453,7 @@ def _plot_velocity_differences(original: List[Tuple[int, int, int]],
     """
     # Create lookup for humanized velocities
     humanized_dict = {(t, n): v for t, n, v in humanized}
-    
+
     # Calculate differences
     times, diffs = [], []
     for t, n, v in original:
@@ -451,7 +464,7 @@ def _plot_velocity_differences(original: List[Tuple[int, int, int]],
     # Plot differences
     if times:
         ax.bar(times, diffs, alpha=0.6, width=50)
-        ax.axhline(y=0, color='w', linestyle='-', alpha=0.2)
+        ax.axhline(y=0, color="w", linestyle="-", alpha=0.2)
         ax.set_title("Velocity Differences")
         ax.set_ylabel("Δ Velocity")
         ax.grid(True, alpha=0.2)
