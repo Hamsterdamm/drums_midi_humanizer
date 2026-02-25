@@ -150,6 +150,16 @@ DRUMMER_PROFILES: Dict[str, Dict[str, float]] = {
         "groove_consistency": 0.8,
         "rudiment_sensitivity": 0.6,  # Moderate rudiment detection
     },
+    "tight": {
+        "timing_bias": 0,
+        "velocity_emphasis": 0.9,
+        "ghost_multiplier": 0.8,
+        "kick_timing_tightness": 1.6,
+        "hihat_variation": 0.5,
+        "rushing_factor": 0,
+        "groove_consistency": 0.9,
+        "rudiment_sensitivity": 0.7,
+    },
     "precise": {
         "timing_bias": 0,
         "velocity_emphasis": 0.8,
