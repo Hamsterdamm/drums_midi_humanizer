@@ -98,8 +98,6 @@ class DrumHumanizer:
         self.time_sig_denominator = 4
         self.tempo_drift = 0
         self.merged_fills = []
-        self.last_pattern = None
-        self.current_timing_variation = self.config.timing_variation
 
     def _get_drummer_profile(self) -> DrummerProfile:
         """Retrieve the selected drummer profile based on configuration.

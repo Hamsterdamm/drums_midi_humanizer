@@ -316,7 +316,7 @@ class DrumVisualizer:
         def get_timing_variations(messages):
             times = np.array([t for t, m in messages if m.type == "note_on" and m.velocity > 0])
             if len(times) < 2:
-                return []
+                return np.array([])
             intervals = np.diff(times)
             return intervals - np.round(intervals / (ticks_per_beat / 4)) * (ticks_per_beat / 4)
 
