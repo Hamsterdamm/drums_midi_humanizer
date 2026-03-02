@@ -2,48 +2,56 @@
 
 ## Current Status
 **Maturity Level:** Beta / In-Refactor
-**Code Quality:** High (Style/Structure), Low (Integration/Logic)
+**Code Quality:** High (Style/Structure), Mixed (Integration/Logic/Robustness)
 
-The project has a professional structure and good test coverage, but the core "humanization" engine is currently using simplified logic, leaving the advanced features (rudiments, fills, complex grooves) implemented but disconnected.
+The project demonstrates a solid architectural foundation with separation of concerns (CLI, Core, Config, Viz). However, the integration of advanced humanization logic (rudiments) is incomplete, and the application lacks robustness regarding file I/O, MIDI metadata (tempo/time signature), and edge cases (division by zero).
 
 ## Critical Issues (Bugs & Logic Gaps)
 
-### 1. Rudiment Detection is Unused
-**Severity:** High
-- **Issue:** `_detect_and_apply_rudiments` is defined but never called.
-- **Impact:** Rudiment patterns are not applied.
+### 1. Logic Disconnects
+- **Rudiment Detection Unused (High)**: `_detect_and_apply_rudiments` is defined but never called in the main processing loop.
+- **Empty Groove Patterns (Medium)**: If no repeating patterns are found, `groove_patterns` is empty, potentially causing logic errors in `is_pattern_point`.
 
-### 2. Time Signature Handling
-**Severity:** Medium
-- **Issue:** `DrumHumanizer` hardcodes `time_sig_numerator` to 4. It ignores `time_signature` events in the source MIDI.
-- **Impact:** Measure position calculations (`_get_measure_position`) are wrong for any track not in 4/4 time (e.g., waltzes, 6/8).
+### 2. MIDI & Music Theory Limitations
+- **Time Signature Assumptions (Medium)**: Hardcoded to 4/4. `time_signature` meta-messages are ignored, breaking logic for 3/4, 6/8, etc.
+- **Tempo Changes Ignored (Medium)**: The script does not account for tempo changes, which is critical if absolute time calculations are ever needed.
+- **Channel Handling (Low)**: MIDI channel information is not preserved or validated; output defaults to channel 0 or copies blindly without checks.
+- **Note Off/Duration (Low)**: New notes are created with a fixed length (often 1 tick), ignoring the original duration or musical context.
 
-### 3. Note Off Handling
-**Severity:** Low
-- **Issue:** New notes are created with a fixed length of 1 tick.
-- **Impact:** May look messy in DAWs or be cut off by some samplers.
+### 3. Runtime Stability
+- **Division by Zero (High)**: In fill analysis, `fill_end - fill_start` can be zero, causing a crash.
+- **Exception Handling (Medium)**: Lack of `try/except` blocks for file I/O (loading/saving MIDI).
+- **Input Validation (Low)**: Drummer styles are not validated before access.
 
 ## Code Quality Observations
 
-- **Type Hinting:** Excellent usage throughout the `src` directory.
-- **Testing:** Good coverage, though tests likely pass because they test the *components* individually, not the full integration of advanced logic in `process_file`.
-- **Configuration:** `HumanizerConfig` is well-structured using dataclasses.
+- **Strengths**:
+    - **Type Hinting**: Excellent usage throughout `src`.
+    - **Configuration**: `HumanizerConfig` dataclass is clean.
+    - **Modular Design**: Clear separation between core logic and CLI.
+
+- **Weaknesses**:
+    - **Redundant Logic**: Multiple `random.seed()` resets found in code.
+    - **Memory Efficiency**: Loads all notes into memory; could be problematic for massive MIDI files.
+    - **Logging**: Relies on `print` statements instead of the `logging` module.
 
 ## TODO Roadmap
 
-### Phase 1: Integration (Fixing the Logic)
-- [ ] **Implement Rudiments**: Integrate `detect_rudiment_pattern` and pass pattern data to `humanize_timings`.
+### Phase 1: Stability & Core Logic Fixes
+- [ ] **Fix Division by Zero**: Add checks in fill analysis for zero-duration fills.
+- [ ] **Exception Handling**: Wrap file operations in `try/except` blocks with user-friendly error messages.
+- [ ] **Validate Inputs**: Ensure `drummer_style` exists in config before processing.
+- [ ] **Integrate Rudiments**: Call `_detect_and_apply_rudiments` within `process_file`.
 
-### Phase 2: MIDI Metadata Support
-- [ ] **Read Time Signature**:
-    - [ ] Scan track for `time_signature` meta-messages.
-    - [ ] Update `self.time_sig_numerator` dynamically during processing or map changes over time.
-- [ ] **Preserve Non-Note Data**: Ensure all meta-events (track name, tempo, copyright) are preserved exactly.
+### Phase 2: MIDI Fidelity
+- [ ] **Dynamic Time Signatures**: Parse `time_signature` events and update `time_sig_numerator` dynamically.
+- [ ] **Preserve Metadata**: Ensure Track Name, Tempo, Copyright, and Channel info are preserved in the output.
+- [ ] **Note Durations**: Preserve original note durations or implement a smart duration logic (e.g., 1/16th default).
 
-### Phase 3: Enhancements
-- [ ] **Reproducibility**: Add a `seed` argument to `HumanizerConfig` and initialize `random.seed()` at the start of processing.
-- [ ] **Note Duration**: Calculate original note duration and preserve it, or use a sensible default (e.g., 1/16th note) instead of 1 tick.
+### Phase 3: Refactoring & Enhancements
 - [ ] **Logging**: Replace `print` statements with Python's `logging` module.
+- [ ] **Reproducibility**: Centralize RNG seeding (remove redundant resets) and expose seed in Config.
+- [ ] **Optimization**: Investigate generator-based processing for large files.
 
 ## Entity Relationship Diagram (Current)
 
