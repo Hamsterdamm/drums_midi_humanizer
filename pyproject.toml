@@ -27,6 +27,7 @@ dependencies = [
     "mido>=1.2.0",
     "numpy>=1.20.0",
     "matplotlib>=3.4.0",
+    "Pillow>=9.0.0",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +40,7 @@ dev = [
 
 [project.scripts]
 humanize-drums = "drums_midi_humanizer.cli:main"
+humanize-drums-gui = "drums_midi_humanizer.gui:main"
 
 [tool.black]
 line-length = 100
