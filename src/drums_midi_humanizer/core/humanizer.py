@@ -241,40 +241,88 @@ class DrumHumanizer:
         humanized_messages = []
         notes_processed_count = 0
 
+        # Pair note_on and note_off events to preserve duration
+        parsed_notes = []
+        active_notes = {}  # note -> list of (start_time, velocity, channel, msg)
+        non_note_events = []
+
         for time, msg in events_with_absolute_time:
             if msg.type == "note_on" and msg.velocity > 0:
-                notes_processed_count += 1
-                original_messages.append((time, msg.note, msg.velocity))
+                if msg.note not in active_notes:
+                    active_notes[msg.note] = []
+                active_notes[msg.note].append((time, msg.velocity, msg.channel, msg))
+            elif (msg.type == "note_off") or (msg.type == "note_on" and msg.velocity == 0):
+                if msg.note in active_notes and active_notes[msg.note]:
+                    start_time, velocity, channel, orig_msg = active_notes[msg.note].pop(0)
+                    duration = time - start_time
+                    parsed_notes.append({
+                        "start": start_time,
+                        "duration": duration,
+                        "note": msg.note,
+                        "velocity": velocity,
+                        "channel": channel,
+                        "orig_msg": orig_msg
+                    })
+            else:
+                non_note_events.append((time, msg))
 
-                measure_pos = self._get_measure_position(time)
-                measure_duration = self.ticks_per_beat * self.time_sig_numerator
-                measure_idx = int(time / measure_duration) if measure_duration > 0 else 0
-                in_fill = any(start <= time <= end for start, end in self.merged_fills)
+        # Handle notes without a corresponding note_off
+        for note, pending in active_notes.items():
+            for start_time, velocity, channel, orig_msg in pending:
+                # Default to a 16th note duration if cut off
+                duration = self.ticks_per_beat // 4
+                parsed_notes.append({
+                    "start": start_time,
+                    "duration": duration,
+                    "note": note,
+                    "velocity": velocity,
+                    "channel": channel,
+                    "orig_msg": orig_msg
+                })
 
-                # Apply advanced humanization logic
-                timing_offset = self.humanize_timings(
-                    msg, time, notes_by_time, in_fill, False, None, measure_pos
-                )
-                new_time = max(0, time + timing_offset)
-                new_velocity = self.humanize_velocity(
-                    msg, time, in_fill, measure_pos, measure_idx
-                )
+        # Sort notes by start time to process in order
+        parsed_notes.sort(key=lambda x: x["start"])
 
-                # We reconstruct note_on and note_off events completely.
-                # Shifting a note_on requires shifting the corresponding note_off to maintain duration,
-                # but since we might change duration or timing, it's safer to generate fresh pairs.
-                processed_events.append(
-                    (new_time, mido.Message("note_on", note=msg.note, velocity=new_velocity))
-                )
-                # Use a fixed short duration for drum hits to ensure clean triggering.
-                processed_events.append(
-                    (new_time + 1, mido.Message("note_off", note=msg.note, velocity=0))
-                )
+        # Add non-note events to the processed list
+        processed_events.extend(non_note_events)
 
-                humanized_messages.append((new_time, msg.note, new_velocity))
+        for note_data in parsed_notes:
+            time = note_data["start"]
+            msg = note_data["orig_msg"]
 
-            elif msg.type != "note_off":  # Keep other messages (CC, pitch bend), discard original note_offs
-                processed_events.append((time, msg))
+            notes_processed_count += 1
+            original_messages.append((time, msg.note, msg.velocity))
+
+            measure_pos = self._get_measure_position(time)
+            measure_duration = self.ticks_per_beat * self.time_sig_numerator
+            measure_idx = int(time / measure_duration) if measure_duration > 0 else 0
+            in_fill = any(start <= time <= end for start, end in self.merged_fills)
+
+            # Apply advanced humanization logic
+            timing_offset = self.humanize_timings(
+                msg, time, notes_by_time, in_fill, False, None, measure_pos
+            )
+            new_time = max(0, time + timing_offset)
+            new_velocity = self.humanize_velocity(
+                msg, time, in_fill, measure_pos, measure_idx
+            )
+
+            # Preserve original duration
+            new_duration = note_data["duration"]
+            new_end = new_time + new_duration
+
+            # Ensure end time is after start time
+            if new_end <= new_time:
+                new_end = new_time + 1
+
+            processed_events.append(
+                (new_time, mido.Message("note_on", note=msg.note, velocity=new_velocity, channel=note_data["channel"]))
+            )
+            processed_events.append(
+                (new_end, mido.Message("note_off", note=msg.note, velocity=0, channel=note_data["channel"]))
+            )
+
+            humanized_messages.append((new_time, msg.note, new_velocity))
 
         # Add ghost notes
         if self.config.ghost_note_prob > 0:
