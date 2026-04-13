@@ -121,7 +121,7 @@ class DrumHumanizer:
         """
         return calculate_measure_position(time, self.ticks_per_beat, self.time_sig_numerator)
 
-    def process_file(self, input_file: str, output_file: str | None = None) -> None:
+    def process_file(self, input_file: str, output_file: str | None = None) -> Tuple[List[Tuple], List[Tuple]]:
         """Process a MIDI file and apply humanization.
 
         Reads the input MIDI file, applies timing and velocity variations to
@@ -131,6 +131,10 @@ class DrumHumanizer:
             input_file (str): Path to the source MIDI file.
             output_file (str | None): Path to save the humanized MIDI file. If None,
                 defaults to '{input_stem}_humanized.mid'.
+                
+        Returns:
+            Tuple[List[Tuple], List[Tuple]]: A tuple containing the original and humanized
+            message lists for visualization formatting.
         """
         if output_file is None:
             input_path = Path(input_file)
@@ -141,7 +145,7 @@ class DrumHumanizer:
             midi_file = mido.MidiFile(input_file)
         except Exception as e:
             logger.error(f"Error loading MIDI file: {e}")
-            return
+            return [], []
 
         self.ticks_per_beat = midi_file.ticks_per_beat
         logger.info(f"MIDI file loaded. Ticks per beat: {self.ticks_per_beat}, Tracks: {len(midi_file.tracks)}")
@@ -169,6 +173,8 @@ class DrumHumanizer:
             create_drum_visualization(
                 original_messages_for_viz, humanized_messages_for_viz, visualization_file
             )
+            
+        return original_messages_for_viz, humanized_messages_for_viz
 
     def _generate_ghost_notes(self, events: List[Tuple[int, mido.Message]]) -> List[Tuple[int, int, int]]:
         """Generate ghost notes based on probability and empty spaces."""

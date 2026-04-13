@@ -370,19 +370,18 @@ class DrumVisualizer:
             ax.grid(True, alpha=0.2)
 
 
-def create_drum_visualization(
+def build_drum_figure(
     original_messages: List[Tuple[int, int, int]],
-    humanized_messages: List[Tuple[int, int, int]],
-    output_png: str,
-) -> None:
-    """Create a detailed visualization comparing original and humanized MIDI drum patterns.
-
-    This function uses a simpler input format (tuples of ints) compared to the class-based method.
-
+    humanized_messages: List[Tuple[int, int, int]]
+) -> plt.Figure:
+    """Builds and returns the Matplotlib figure comparing original and humanized MIDI drum patterns.
+    
     Args:
         original_messages: List of (time, note, velocity) tuples from original MIDI.
         humanized_messages: List of (time, note, velocity) tuples from humanized MIDI.
-        output_png: Path to save the output PNG visualization.
+        
+    Returns:
+        plt.Figure: The constructed Matplotlib figure object.
     """
     # Set dark style for better visibility
     plt.style.use("dark_background")
@@ -403,16 +402,34 @@ def create_drum_visualization(
     _plot_drum_grid(original_messages, categories, ax1, "Original MIDI")
 
     # Plot humanized notes
-    ax2 = plt.subplot(gs[1])
+    ax2 = plt.subplot(gs[1], sharex=ax1)
     _plot_drum_grid(humanized_messages, categories, ax2, "Humanized MIDI")
 
     # Plot velocity differences
-    ax3 = plt.subplot(gs[2])
+    ax3 = plt.subplot(gs[2], sharex=ax1)
     _plot_velocity_differences(original_messages, humanized_messages, ax3)
 
-    plt.tight_layout()
-    plt.savefig(output_png, dpi=300, bbox_inches="tight")
-    plt.close()
+    fig.subplots_adjust(hspace=0.4, top=0.95, bottom=0.08, left=0.1, right=0.88)
+    return fig
+
+
+def create_drum_visualization(
+    original_messages: List[Tuple[int, int, int]],
+    humanized_messages: List[Tuple[int, int, int]],
+    output_png: str,
+) -> None:
+    """Create a detailed visualization comparing original and humanized MIDI drum patterns.
+
+    This function uses a simpler input format (tuples of ints) compared to the class-based method.
+
+    Args:
+        original_messages: List of (time, note, velocity) tuples from original MIDI.
+        humanized_messages: List of (time, note, velocity) tuples from humanized MIDI.
+        output_png: Path to save the output PNG visualization.
+    """
+    fig = build_drum_figure(original_messages, humanized_messages)
+    fig.savefig(output_png, dpi=300, bbox_inches="tight")
+    plt.close(fig)
 
 
 def _plot_drum_grid(
@@ -435,15 +452,21 @@ def _plot_drum_grid(
                 times.append(t)
                 vels.append(v)
         if times:  # Only plot if we have notes in this category
+            # Draw a small diamond to represent the precise note hit time
             ax.scatter(
-                times, [i] * len(times), s=np.array(vels) * 2, c=[colors[i]], alpha=0.6, label=cat
+                times, [i] * len(times), s=20, c=[colors[i]], marker="d", alpha=0.9, label=cat
+            )
+            # Draw a trailing up-stalk indicating the velocity natively
+            normalized_vels = [i + (v / 127.0) * 0.4 for v in vels]
+            ax.vlines(
+                times, [i] * len(times), normalized_vels, color=colors[i], alpha=0.5, linewidth=1.5
             )
 
-    ax.set_title(title)
+    ax.set_title(title, pad=10)
     ax.set_yticks(range(len(categories)))
-    ax.set_yticklabels(categories.keys())
-    ax.grid(True, alpha=0.2)
-    ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left")
+    ax.set_yticklabels(list(categories.keys()))
+    ax.grid(True, alpha=0.15)
+    ax.legend(bbox_to_anchor=(1.01, 1), loc="upper left")
 
 
 def _plot_velocity_differences(
@@ -468,8 +491,9 @@ def _plot_velocity_differences(
 
     # Plot differences
     if times:
-        ax.bar(times, diffs, alpha=0.6, width=50)
-        ax.axhline(y=0, color="w", linestyle="-", alpha=0.2)
-        ax.set_title("Velocity Differences")
+        colors = ["#44FF44" if d > 0 else "#FF4444" for d in diffs]
+        ax.vlines(times, 0, diffs, color=colors, alpha=0.7, linewidth=1.5)
+        ax.axhline(y=0, color="w", linestyle="-", alpha=0.3)
+        ax.set_title("Velocity Differences", pad=10)
         ax.set_ylabel("Δ Velocity")
-        ax.grid(True, alpha=0.2)
+        ax.grid(True, alpha=0.15)
