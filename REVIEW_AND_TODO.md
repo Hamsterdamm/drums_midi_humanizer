@@ -4,53 +4,46 @@
 **Maturity Level:** Beta / In-Refactor
 **Code Quality:** High (Style/Structure), Mixed (Integration/Logic/Robustness)
 
-The project demonstrates a solid architectural foundation with separation of concerns (CLI, Core, Config, Viz). However, the integration of advanced humanization logic (rudiments) is incomplete, and the application lacks robustness regarding file I/O, MIDI metadata (tempo/time signature), and edge cases (division by zero).
+The project demonstrates a solid architectural foundation with separation of concerns (CLI, Core, Config, Viz). Several critical issues have been recently resolved including logging, exception handling, and note duration preservation. However, the integration of advanced humanization logic (rudiments) remains incomplete, and the application still relies on certain hardcoded assumptions regarding MIDI metadata (tempo/time signature).
 
 ## Critical Issues (Bugs & Logic Gaps)
 
 ### 1. Logic Disconnects
-- **Rudiment Detection Unused (High)**: `_detect_and_apply_rudiments` is defined but never called in the main processing loop.
-- **Empty Groove Patterns (Medium)**: If no repeating patterns are found, `groove_patterns` is empty, potentially causing logic errors in `is_pattern_point`.
+- **Rudiment Detection Unused (High)**: `detect_rudiment_pattern` is defined in `utils/midi.py` but never utilized directly in the main `process_file` loops.
 
 ### 2. MIDI & Music Theory Limitations
-- **Time Signature Assumptions (Medium)**: Hardcoded to 4/4. `time_signature` meta-messages are ignored, breaking logic for 3/4, 6/8, etc.
-- **Tempo Changes Ignored (Medium)**: The script does not account for tempo changes, which is critical if absolute time calculations are ever needed.
-- **Channel Handling (Low)**: MIDI channel information is not preserved or validated; output defaults to channel 0 or copies blindly without checks.
-- **Note Off/Duration (Low)**: New notes are created with a fixed length (often 1 tick), ignoring the original duration or musical context.
-
-### 3. Runtime Stability
-- **Division by Zero (High)**: In fill analysis, `fill_end - fill_start` can be zero, causing a crash.
-- **Exception Handling (Medium)**: Lack of `try/except` blocks for file I/O (loading/saving MIDI).
-- **Input Validation (Low)**: Drummer styles are not validated before access.
+- **Time Signature Assumptions (Medium)**: Hardcoded `self.time_sig_numerator = 4`. `time_signature` meta-messages exist but are not tracked to dynamically alter logic for 3/4, 6/8, etc.
+- **Tempo Changes Ignored (Medium)**: The script does not dynamically assess its timings based on shifting tempos through the track.
 
 ## Code Quality Observations
 
 - **Strengths**:
     - **Type Hinting**: Excellent usage throughout `src`.
-    - **Configuration**: `HumanizerConfig` dataclass is clean.
-    - **Modular Design**: Clear separation between core logic and CLI.
+    - **Configuration**: Explicit `HumanizerConfig` dataclass and CLI argument parsing performs robust validation.
+    - **Modular Design**: Clear separation between core logic, utils, and CLI.
+    - **Stability**: Both division by zero and file-loading crashes have been resolved with graceful error handling and constraints.
+    - **Logging**: Python's native `logging` module is properly implemented, replacing verbose `print` statements.
 
 - **Weaknesses**:
-    - **Redundant Logic**: Multiple `random.seed()` resets found in code.
-    - **Memory Efficiency**: Loads all notes into memory; could be problematic for massive MIDI files.
-    - **Logging**: Relies on `print` statements instead of the `logging` module.
+    - **Redundant Logic**: Ad-hoc random seed resets (`random.seed(None)`) found in code, instead of an isolated PRNG.
+    - **Memory Efficiency**: Loads all notes into memory within the humanization track list; could be problematic for massive MIDI files.
 
 ## TODO Roadmap
 
 ### Phase 1: Stability & Core Logic Fixes
-- [ ] **Fix Division by Zero**: Add checks in fill analysis for zero-duration fills.
-- [ ] **Exception Handling**: Wrap file operations in `try/except` blocks with user-friendly error messages.
-- [ ] **Validate Inputs**: Ensure `drummer_style` exists in config before processing.
-- [ ] **Integrate Rudiments**: Call `_detect_and_apply_rudiments` within `process_file`.
+- [x] **Fix Division by Zero**: Add checks in fill analysis for zero-duration fills.
+- [x] **Exception Handling**: Wrap file operations in `try/except` blocks with user-friendly error messages.
+- [x] **Validate Inputs**: Ensure inputs like `drummer_style` and probabilities are validated via CLI choices and config data.
+- [ ] **Integrate Rudiments**: Call `detect_rudiment_pattern` within `process_file` to affect humanizer outcomes.
 
 ### Phase 2: MIDI Fidelity
 - [ ] **Dynamic Time Signatures**: Parse `time_signature` events and update `time_sig_numerator` dynamically.
-- [ ] **Preserve Metadata**: Ensure Track Name, Tempo, Copyright, and Channel info are preserved in the output.
-- [ ] **Note Durations**: Preserve original note durations or implement a smart duration logic (e.g., 1/16th default).
+- [x] **Preserve Metadata**: Channel logic is mapped correctly and non-note-events are successfully passed into the output.
+- [x] **Note Durations**: `note_off` and `note_on` messages are successfully paired, maintaining original note durations on rewrite.
 
 ### Phase 3: Refactoring & Enhancements
-- [ ] **Logging**: Replace `print` statements with Python's `logging` module.
-- [ ] **Reproducibility**: Centralize RNG seeding (remove redundant resets) and expose seed in Config.
+- [x] **Logging**: Replace `print` statements with Python's `logging` module.
+- [ ] **Reproducibility**: Centralize RNG seeding (remove redundant resets) and expose master seed in Config.
 - [ ] **Optimization**: Investigate generator-based processing for large files.
 
 ## Entity Relationship Diagram (Current)
@@ -59,9 +52,8 @@ The project demonstrates a solid architectural foundation with separation of con
 classDiagram
     class DrumHumanizer {
         +process_file()
-        -humanize_timings() [USED]
-        -humanize_velocity() [USED]
-        -_detect_and_apply_rudiments() [UNUSED]
+        -humanize_timings()
+        -humanize_velocity()
     }
     
     class HumanizerConfig {
