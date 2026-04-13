@@ -45,6 +45,16 @@ class HumanizerApp:
         self._setup_parameters()
         self._setup_actions()
         self._setup_image_display()
+        
+        self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
+
+    def _on_closing(self):
+        import matplotlib.pyplot as plt
+        plt.close('all')
+        self.root.quit()
+        self.root.destroy()
+        import sys
+        sys.exit(0)
 
     def _setup_file_selection(self):
         file_frame = ttk.LabelFrame(self.main_frame, text="File Selection", padding="10")
