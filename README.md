@@ -27,28 +27,31 @@ This script takes a quantized, robotic-sounding MIDI drum track and applies subt
     cd drums_midi_humanizer
     ```
 
-2.  **Create a virtual environment (recommended):**
+2.  **Install uv (if not already installed):**
     ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+    # On macOS/Linux
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    
+    # On Windows
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
     ```
 
-3.  **Install the required dependencies:**
+3.  **Sync the environment:**
     ```bash
-    pip install -r requirements.txt
+    uv sync
     ```
-    *(Note: If a `requirements.txt` file does not exist, you can install the dependencies directly from `pyproject.toml` using a modern package manager like Poetry or by manually installing the packages listed under `[project.dependencies]`.)*
+    *(This automatically creates a `.venv` locked to the project dependencies.)*
 
 ## Usage
 
-The script is run from the command line.
+The script is run from the command line using `uv run`.
 
 ### Basic Usage
 
 To humanize a MIDI file with the default "balanced" drummer style:
 
 ```bash
-python humanize-drums.py "path/to/your/drum-track.mid"
+uv run humanize-drums.py "path/to/your/drum-track.mid"
 ```
 
 This will create a new file named `drum-track_humanized.mid` in the same directory.
@@ -58,7 +61,7 @@ This will create a new file named `drum-track_humanized.mid` in the same directo
 You can customize the humanization with various command-line arguments:
 
 ```bash
-python humanize-drums.py "input.mid" -o "output.mid" --style tight --timing 8 --velocity 20 --visualize
+uv run humanize-drums.py "input.mid" -o "output.mid" --style tight --timing 8 --velocity 20 --visualize
 ```
 
 ### Command-Line Options
@@ -80,19 +83,19 @@ python humanize-drums.py "input.mid" -o "output.mid" --style tight --timing 8 --
 **1. Applying a "tight" and precise feel:**
 
 ```bash
-python humanize-drums.py "my_song_drums.mid" --style tight --timing 5
+uv run humanize-drums.py "my_song_drums.mid" --style tight --timing 5
 ```
 
 **2. Creating a "loose" and "lazy" groove with some swing:**
 
 ```bash
-python humanize-drums.py "jazz_drums.mid" --style lazy --shuffle 0.3
+uv run humanize-drums.py "jazz_drums.mid" --style lazy --shuffle 0.3
 ```
 
 **3. Humanizing a track and generating a visualization:**
 
 ```bash
-python humanize-drums.py "rock_beat.mid" -o "rock_beat_human.mid" --style powerful --visualize
+uv run humanize-drums.py "rock_beat.mid" -o "rock_beat_human.mid" --style powerful --visualize
 ```
 
 This will create `rock_beat_human.mid` and `rock_beat_human.png`.

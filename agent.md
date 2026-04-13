@@ -53,5 +53,5 @@ The primary processor. It maintains state for:
 
 ## Usage Example
 ```bash
-python humanize-drums.py "input.mid" --style tight --timing 5 --visualize
+uv run humanize-drums.py "input.mid" --style tight --timing 5 --visualize
 ```
