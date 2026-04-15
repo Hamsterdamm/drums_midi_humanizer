@@ -14,10 +14,10 @@ This script takes a quantized, robotic-sounding MIDI drum track and applies subt
   - **Accents**: Adds emphasis to certain notes.
   - **Flams**: Creates realistic flam strokes on the snare.
   - **Shuffle/Swing**: Applies a shuffle or swing feel to the groove.
+  - **Rudiment Pattern Matching**: Actively scans for complex cohesive phrases (like paradiddles or flam taps) and selectively blends their foundational mechanical dynamics directly into the drummer's profile attributes for more contextual realism.
 - **Instrument-Specific Logic**: Applies different humanization rules to different parts of the drum kit for a more authentic sound.
-- **Rudiment Detection**: Identifies common drumming patterns (rudiments) and applies specialized humanization to them.
 - **Drum Library Support**: Can be configured for different drum sound libraries (e.g., General MIDI, Addictive Drums 2, Superior Drummer 3).
-- **Visualization**: Generates a PNG image that visually compares the original and humanized MIDI patterns, showing the changes in timing and velocity.
+- **Visualization**: An interactive desktop GUI application provides a detailed 5-plot analytical interface, allowing you to visualize velocity and timing shifts with dynamic time-axis zooming. You can also generate static PNG comparisons using the CLI.
 
 ## Installation
 
@@ -46,9 +46,17 @@ This script takes a quantized, robotic-sounding MIDI drum track and applies subt
 
 The script is run from the command line using `uv run`.
 
-### Basic Usage
+### Desktop GUI (Recommended)
 
-To humanize a MIDI file with the default "balanced" drummer style:
+To launch the interactive visual application and configure your parameters seamlessly:
+
+```bash
+uv run humanize-drums-gui
+```
+
+### Basic CLI Usage
+
+To humanize a MIDI file with the default "balanced" drummer style via terminal:
 
 ```bash
 uv run humanize-drums.py "path/to/your/drum-track.mid"
@@ -102,7 +110,7 @@ This will create `rock_beat_human.mid` and `rock_beat_human.png`.
 
 ## How It Works
 
-The script parses the input MIDI file and iterates through the drum notes. For each note, it applies a series of transformations based on the selected drummer profile and other parameters. It then reconstructs the MIDI track with the new, humanized timing and velocity information, ensuring that all other MIDI messages (like tempo changes) are preserved.
+The script parses the input MIDI file and iterates through the drum notes. It scans continuous instrument notes for cohesive sequences using pattern-matching mapped to a dictionary of predefined real-world Drum Rudiments. For each note, it applies a series of transformations based on the selected drummer profile, rudiment characteristics (if matched), and other parameters. It then reconstructs the MIDI track with the new, humanized timing and velocity information, ensuring that all other MIDI messages (like tempo changes) are preserved.
 
 ## Project Architecture
 

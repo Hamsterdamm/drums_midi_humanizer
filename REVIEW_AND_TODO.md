@@ -9,7 +9,7 @@ The project demonstrates a solid architectural foundation with separation of con
 ## Critical Issues (Bugs & Logic Gaps)
 
 ### 1. Logic Disconnects
-- **Rudiment Detection Unused (High)**: `detect_rudiment_pattern` is defined in `utils/midi.py` but never utilized directly in the main `process_file` loops.
+- ~~**Rudiment Detection Unused (High)**: `detect_rudiment_pattern` is defined in `utils/midi.py` but never utilized directly in the main `process_file` loops.~~ **(Resolved)**
 
 ### 2. MIDI & Music Theory Limitations
 - **Time Signature Assumptions (Medium)**: Hardcoded `self.time_sig_numerator = 4`. `time_signature` meta-messages exist but are not tracked to dynamically alter logic for 3/4, 6/8, etc.
@@ -34,7 +34,7 @@ The project demonstrates a solid architectural foundation with separation of con
 - [x] **Fix Division by Zero**: Add checks in fill analysis for zero-duration fills.
 - [x] **Exception Handling**: Wrap file operations in `try/except` blocks with user-friendly error messages.
 - [x] **Validate Inputs**: Ensure inputs like `drummer_style` and probabilities are validated via CLI choices and config data.
-- [ ] **Integrate Rudiments**: Call `detect_rudiment_pattern` within `process_file` to affect humanizer outcomes.
+- [x] **Integrate Rudiments**: Call `detect_rudiment_pattern` within `process_file` to affect humanizer outcomes.
 
 ### Phase 2: MIDI Fidelity
 - [ ] **Dynamic Time Signatures**: Parse `time_signature` events and update `time_sig_numerator` dynamically.
@@ -42,6 +42,7 @@ The project demonstrates a solid architectural foundation with separation of con
 - [x] **Note Durations**: `note_off` and `note_on` messages are successfully paired, maintaining original note durations on rewrite.
 
 ### Phase 3: Refactoring & Enhancements
+- [x] **Desktop GUI**: Built a fully interactive `tkinter` application with a responsive, synchronized 5-plot playback and visualizer via `matplotlib`.
 - [x] **Logging**: Replace `print` statements with Python's `logging` module.
 - [ ] **Reproducibility**: Centralize RNG seeding (remove redundant resets) and expose master seed in Config.
 - [ ] **Optimization**: Investigate generator-based processing for large files.
