@@ -255,7 +255,7 @@ def merge_overlapping_fills(fills: List[Tuple[int, int]]) -> List[Tuple[int, int
 
     # Sort by start time to allow for a single-pass linear merge algorithm.
     sorted_fills = sorted(fills, key=lambda x: x[0])
-    merged = []
+    merged: List[Tuple[int, int]] = []
 
     for fill in sorted_fills:
         # If no overlap with the previous region, start a new block

@@ -97,7 +97,7 @@ class DrumHumanizer:
         self.time_sig_numerator = 4
         self.time_sig_denominator = 4
         self.tempo_drift = 0
-        self.merged_fills = []
+        self.merged_fills: List[Tuple[int, int]] = []
 
     def _get_drummer_profile(self) -> DrummerProfile:
         """Retrieve the selected drummer profile based on configuration.
@@ -230,7 +230,7 @@ class DrumHumanizer:
         # Build context: notes by time
         # We need random access to notes occurring at specific times to make context-aware decisions
         # (e.g., adjusting hi-hat timing if a snare is played at the same time).
-        notes_by_time = {}
+        notes_by_time: Dict[int, List[mido.Message]] = {}
         for time, msg in events_with_absolute_time:
             if msg.type == "note_on" and msg.velocity > 0:
                 if time not in notes_by_time:
@@ -249,7 +249,7 @@ class DrumHumanizer:
 
         # Pair note_on and note_off events to preserve duration
         parsed_notes = []
-        active_notes = {}  # note -> list of (start_time, velocity, channel, msg)
+        active_notes: Dict[int, List[Tuple[int, int, int, mido.Message]]] = {}  # note -> list of (start_time, velocity, channel, msg)
         non_note_events = []
 
         for time, msg in events_with_absolute_time:
@@ -374,7 +374,7 @@ class DrumHumanizer:
         Returns:
             int: The calculated timing offset in ticks.
         """
-        note_type_timing_var = 0
+        note_type_timing_var: float = 0.0
 
         # Different timing handling based on drum type
         if msg.note in self.KICK_NOTES:
@@ -424,7 +424,7 @@ class DrumHumanizer:
         Returns:
             int: The new velocity value (clamped between 1 and 127).
         """
-        velocity_var = 0
+        velocity_var: int = 0
 
         # Apply different velocity patterns based on drum type
         if msg.note in self.KICK_NOTES:
@@ -444,10 +444,10 @@ class DrumHumanizer:
 
         # Apply accent probability
         if random.random() < self.config.accent_prob:
-            accent_amount = random.randint(0, 5) * self.profile.velocity_emphasis
+            accent_amount = int(random.randint(0, 5) * self.profile.velocity_emphasis)
             velocity_var += accent_amount
 
-        return max(1, min(127, msg.velocity + int(velocity_var)))
+        return max(1, min(127, msg.velocity + velocity_var))
 
     def _handle_kick_timing(self, measure_position: float) -> float:
         """Calculate timing variation specifically for kick drums."""
@@ -513,32 +513,32 @@ class DrumHumanizer:
     def _handle_kick_velocity(self, measure_position: float) -> int:
         """Calculate velocity adjustment for kick drums."""
         if self._is_downbeat(measure_position):
-            return random.randint(0, 15) * self.profile.velocity_emphasis
-        return random.randint(-10, 0) * self.profile.velocity_emphasis
+            return int(random.randint(0, 15) * self.profile.velocity_emphasis)
+        return int(random.randint(-10, 0) * self.profile.velocity_emphasis)
 
     def _handle_snare_velocity(self, measure_position: float) -> int:
         """Calculate velocity adjustment for snare drums."""
         if self._is_backbeat(measure_position):
-            var = random.randint(0, 15) * self.profile.velocity_emphasis
+            var = int(random.randint(0, 15) * self.profile.velocity_emphasis)
             if random.random() < self.config.accent_prob * 1.5:
                 var += random.randint(0, 5)
             return var
-        return random.randint(-10, 0) * self.profile.velocity_emphasis
+        return int(random.randint(-10, 0) * self.profile.velocity_emphasis)
 
     def _handle_hihat_velocity(self, measure_position: float) -> int:
         """Calculate velocity adjustment for hi-hats."""
         sixteenth_pos = round(measure_position * 16) / 16
         if sixteenth_pos.is_integer():
-            return random.randint(0, 15) * self.profile.velocity_emphasis
+            return int(random.randint(0, 15) * self.profile.velocity_emphasis)
         elif sixteenth_pos * 2 == round(sixteenth_pos * 2):
-            return random.randint(0, 5) * self.profile.velocity_emphasis
-        return random.randint(-15, 0) * self.profile.velocity_emphasis
+            return int(random.randint(0, 5) * self.profile.velocity_emphasis)
+        return int(random.randint(-15, 0) * self.profile.velocity_emphasis)
 
     def _handle_cymbal_velocity(self, measure_position: float, measure_idx: int) -> int:
         """Calculate velocity adjustment for cymbals."""
         if measure_position < 0.1 and measure_idx % 2 == 0:
-            return random.randint(0, 20) * self.profile.velocity_emphasis
-        return random.randint(-10, 0) * self.profile.velocity_emphasis
+            return int(random.randint(0, 20) * self.profile.velocity_emphasis)
+        return int(random.randint(-10, 0) * self.profile.velocity_emphasis)
 
     def _handle_tom_velocity(self, in_fill: bool, time: int) -> int:
         """Calculate velocity adjustment for toms, handling fill dynamics."""
@@ -551,7 +551,7 @@ class DrumHumanizer:
                     return int((fill_position * 30 - 10) * self.profile.velocity_emphasis)
                 else:  # decrescendo
                     return int(((1 - fill_position) * 30 - 10) * self.profile.velocity_emphasis)
-        return random.randint(-15, 15) * self.profile.velocity_emphasis
+        return int(random.randint(-15, 15) * self.profile.velocity_emphasis)
 
     def _calculate_rushing_component(self, measure_position: float) -> float:
         """Calculate the timing offset due to rushing tendencies."""
