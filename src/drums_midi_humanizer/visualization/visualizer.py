@@ -413,6 +413,15 @@ def build_drum_figure(
     _plot_velocity_differences(original_messages, humanized_messages, ax3, ticks_per_beat)
 
     fig.subplots_adjust(hspace=0.4, top=0.95, bottom=0.08, left=0.1, right=0.88)
+
+    # Disable vertical zooming and panning by locking the y-limits
+    for ax in [ax1, ax2, ax3]:
+        original_ylim = ax.get_ylim()
+        def lock_ylim(axes, yl=original_ylim):
+            if axes.get_ylim() != yl:
+                axes.set_ylim(yl, emit=False)
+        ax.callbacks.connect('ylim_changed', lock_ylim)
+
     return fig
 
 
@@ -507,6 +516,9 @@ def _add_timing_grid(ax: plt.Axes, ticks_per_beat: int, beats_per_bar: int = 4) 
     
     ax.xaxis.set_minor_locator(minor_locator)
     ax.xaxis.set_major_locator(major_locator)
+    
+    # Hide the tick number labels
+    ax.tick_params(axis='x', which='both', labelbottom=False)
     
     ax.grid(True, which='major', axis='x', color='w', alpha=0.3, linewidth=1.5)
     ax.grid(True, which='minor', axis='x', color='w', alpha=0.1, linewidth=0.5)
