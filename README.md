@@ -112,6 +112,26 @@ This will create `rock_beat_human.mid` and `rock_beat_human.png`.
 
 The script parses the input MIDI file and iterates through the drum notes. It scans continuous instrument notes for cohesive sequences using pattern-matching mapped to a dictionary of predefined real-world Drum Rudiments. For each note, it applies a series of transformations based on the selected drummer profile, rudiment characteristics (if matched), and other parameters. It then reconstructs the MIDI track with the new, humanized timing and velocity information, ensuring that all other MIDI messages (like tempo changes) are preserved.
 
+## Musical Theory & Implementation
+
+The application treats a drum kit not as a collection of isolated MIDI triggers, but as an interconnected physical instrument played by a human with two arms and two legs. It models several advanced concepts of drum theory:
+
+* **The "Pocket" (Micro-timing):** The application uses `timing_bias` to simulate a drummer playing consistently ahead of the beat (pushes the energy, typical in rock) or behind the beat (laid-back, typical in jazz/R&B).
+* **Limb Interdependence:** When a drummer strikes multiple drums simultaneously (e.g., a kick and a hi-hat), their body naturally locks the limbs together. The code mimics this by reducing hi-hat timing variation when a kick or snare occurs at the same time.
+* **Rebound Physics (Rudiments):** The application recognizes that human hands rely on physics. In a double stroke (RR or LL), the second note is a bounce and naturally has lower velocity than the initial downward stroke. This is accurately mapped in the `velocity_ratio` of the `DRUM_RUDIMENTS` dictionary.
+* **Dynamic Anchoring:** The kick drum serves as the band's metronome. The application explicitly enforces tighter timing on downbeats for the kick drum.
+
+### What is Highly Accurate (Musically Correct)
+
+* **Groove Consistency:** Amateurs make random timing errors; professionals have a consistent "feel." The application captures this by using deterministic hashing (`hash((pattern_key[0], pattern_key[1], msg.note))`) for specific patterns, ensuring that the drummer's unique deviation is identical every time they play a specific groove.
+* **Hi-Hat Velocity Subdivisions:** The `_handle_hihat_velocity` function applies stronger accents on quarter notes, softer on eighth notes, and softest on off-beat sixteenths. This perfectly mirrors the natural "Moeller technique" drummers use to keep time on the hi-hat.
+* **Fill Dynamics:** The application detects fills and applies a 70% chance of a crescendo and 30% chance of a decrescendo across the toms. Drum fills naturally swell into the next section or taper off to create space, making this a highly realistic dynamic envelope.
+
+### Acceptable Approximations (Not strictly correct, but fine for humanization)
+
+* **Ghost Note Generation:** The application generates ghost notes by finding empty 16th-note slots and inserting low-velocity snare hits based on a probability check. Musically, drummers do not play ghost notes randomly; they play them as part of linear subdivisions or specific rudimental stickings around the main backbeat. However, for the goal of MIDI humanization, scattering them procedurally creates the correct *textural density* without requiring a complex linear phrase generator.
+* **Fill Detection:** Fills are detected based on note density and tom usage over a primary subdivision. While a real fill is a deliberate musical phrase (and doesn't always use toms), density is a highly effective heuristic proxy to isolate busier sections of MIDI data for dynamic scaling.
+
 ## Project Architecture
 
 The following UML diagram describes the relationships between the core entities in the project:
