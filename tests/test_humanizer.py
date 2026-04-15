@@ -145,3 +145,48 @@ def test_humanize_track_integration(humanizer):
     assert len(new_track) >= 2
     assert len(orig_msgs) == 1
     assert len(human_msgs) == 1
+
+
+def test_rudiment_integration(humanizer):
+    """Test that a sequence matching a rudiment triggers rudiment logic."""
+    track = mido.MidiTrack()
+    # Create a flam tap sequence: 4 notes on snare (38) with uniform timing
+    # mido track times are relative (delta)
+    # We want notes at absolute times 0, 100, 200, 300
+    track.append(mido.Message("note_on", note=38, velocity=100, time=0))
+    track.append(mido.Message("note_off", note=38, velocity=0, time=100))
+    track.append(mido.Message("note_on", note=38, velocity=100, time=0))
+    track.append(mido.Message("note_off", note=38, velocity=0, time=100))
+    track.append(mido.Message("note_on", note=38, velocity=100, time=0))
+    track.append(mido.Message("note_off", note=38, velocity=0, time=100))
+    track.append(mido.Message("note_on", note=38, velocity=100, time=0))
+    track.append(mido.Message("note_off", note=38, velocity=0, time=100))
+
+    humanizer.ticks_per_beat = 480
+    humanizer.profile.rudiment_sensitivity = 1.0  # Force rudiment detection
+    
+    # We need a fixed variation to safely check values
+    humanizer.config.velocity_variation = 0
+    humanizer.profile.velocity_emphasis = 0
+    
+    # Run humanize track
+    new_track, orig_msgs, human_msgs = humanizer._humanize_track(track)
+    
+    # With velocity_variation = 0, new_velocity before rudiment is exactly original (100)
+    # For flam tap (4 notes), velocity_ratios are usually [1.0, 0.8, 1.0, 0.8]
+    # Blend factor is 0.5. So 100 * (0.5) + (100 * ratio) * 0.5
+    # For ratio 1.0: 50 + 50 = 100
+    # For ratio 0.8: 50 + 40 = 90
+    
+    # Check if any humanized message has velocity roughly around 90 (meaning rudiment was mixed)
+    velocities = [msg[2] for msg in human_msgs]
+    
+    # With accent probability there could be some variation, let's force accent_prob to 0
+    humanizer.config.accent_prob = 0.0
+    # Re-run after zeroing accent probability to ensure perfectly predictable outcome
+    new_track, orig_msgs, human_msgs = humanizer._humanize_track(track)
+    velocities = [msg[2] for msg in human_msgs]
+    
+    # Note: If no other ghost note or accent variations were applied, we should see 90 
+    assert 90 in velocities or 91 in velocities, f"Rudiment velocity blending not applied. Velocities: {velocities}"
+

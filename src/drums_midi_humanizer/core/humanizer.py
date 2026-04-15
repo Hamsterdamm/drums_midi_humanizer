@@ -12,12 +12,13 @@ from typing import Dict, List, Tuple
 
 import mido
 
-from ..config.drums import DrummerProfile, get_drum_map
+from ..config.drums import DrummerProfile, get_drum_map, DRUM_RUDIMENTS
 from ..utils.midi import (
     calculate_measure_position,
     convert_to_relative_times,
     detect_fills,
     get_absolute_times,
+    detect_rudiment_pattern,
 )
 from ..visualization.visualizer import create_drum_visualization
 
@@ -289,6 +290,51 @@ class DrumHumanizer:
         # Sort notes by start time to process in order
         parsed_notes.sort(key=lambda x: x["start"])
 
+        # Rudiment Detection Algorithm
+        hand_notes = []
+        for note_data in parsed_notes:
+            if note_data["note"] not in self.KICK_NOTES:
+                hand_notes.append(note_data)
+
+        matched_note_ids = set()
+        sorted_rudiments = sorted(DRUM_RUDIMENTS.items(), key=lambda item: len(item[1]["pattern"]), reverse=True)
+
+        for rudiment_name, r_data in sorted_rudiments:
+            pattern_len = len(r_data["pattern"])
+            timing_ratios = r_data["timing_ratio"]
+            velocity_ratios = r_data["velocity_ratio"]
+
+            if pattern_len > len(hand_notes):
+                continue
+
+            for i in range(len(hand_notes) - pattern_len + 1):
+                window = hand_notes[i:i + pattern_len]
+                
+                # Check if any note in the window is already matched
+                if any(id(n) in matched_note_ids for n in window):
+                    continue
+
+                notes_for_detection = [(n["start"], n["note"], n["velocity"]) for n in window]
+
+                if detect_rudiment_pattern(
+                    notes=notes_for_detection,
+                    pattern=r_data["pattern"],
+                    timing_ratios=timing_ratios,
+                    ticks_per_beat=self.ticks_per_beat,
+                    tolerance=0.15
+                ) and random.random() < self.profile.rudiment_sensitivity:
+                    # Match found! Tag the notes
+                    start_time = window[0]["start"]
+                    pattern_key = (rudiment_name, start_time)
+                    for idx, n_data in enumerate(window):
+                        n_data["rudiment_metadata"] = {
+                            "name": rudiment_name,
+                            "pattern_key": pattern_key,
+                            "pattern_idx": idx,
+                            "velocity_ratio": velocity_ratios[idx]
+                        }
+                        matched_note_ids.add(id(n_data))
+
         # Add non-note events to the processed list
         processed_events.extend(non_note_events)
 
@@ -304,14 +350,24 @@ class DrumHumanizer:
             measure_idx = int(time / measure_duration) if measure_duration > 0 else 0
             in_fill = any(start <= time <= end for start, end in self.merged_fills)
 
+            rudiment_metadata = note_data.get("rudiment_metadata")
+            is_pattern_point = rudiment_metadata is not None
+            pattern_key = rudiment_metadata["pattern_key"] if is_pattern_point else None
+
             # Apply advanced humanization logic
             timing_offset = self.humanize_timings(
-                msg, time, notes_by_time, in_fill, False, None, measure_pos
+                msg, time, notes_by_time, in_fill, is_pattern_point, pattern_key, measure_pos
             )
             new_time = max(0, time + timing_offset)
             new_velocity = self.humanize_velocity(
                 msg, time, in_fill, measure_pos, measure_idx
             )
+
+            if is_pattern_point:
+                target_ratio = rudiment_metadata["velocity_ratio"]
+                blend_factor = 0.5
+                mixed_velocity = new_velocity * (1 - blend_factor) + (new_velocity * target_ratio) * blend_factor
+                new_velocity = int(max(1, min(127, mixed_velocity)))
 
             # Preserve original duration
             new_duration = note_data["duration"]
