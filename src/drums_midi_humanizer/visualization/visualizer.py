@@ -388,8 +388,8 @@ def build_drum_figure(
     """
     # Set dark style for better visibility
     plt.style.use("dark_background")
-    fig = plt.figure(figsize=(15, 12))
-    gs = plt.GridSpec(3, 1, height_ratios=[5, 5, 1], hspace=0.3)
+    fig = plt.figure(figsize=(15, 18))
+    gs = plt.GridSpec(5, 1, height_ratios=[4, 2, 4, 2, 2], hspace=0.1)
 
     # Categories for grouping drums
     categories = {
@@ -402,20 +402,28 @@ def build_drum_figure(
 
     # Plot original notes
     ax1 = plt.subplot(gs[0])
-    _plot_drum_grid(original_messages, categories, ax1, "Original MIDI", ticks_per_beat)
+    _plot_drum_grid(original_messages, categories, ax1, "Original MIDI Notes", ticks_per_beat, show_legend=True)
+
+    # Plot original velocities
+    ax2 = plt.subplot(gs[1], sharex=ax1)
+    _plot_velocities(original_messages, categories, ax2, "Original MIDI Velocities", ticks_per_beat)
 
     # Plot humanized notes
-    ax2 = plt.subplot(gs[1], sharex=ax1)
-    _plot_drum_grid(humanized_messages, categories, ax2, "Humanized MIDI", ticks_per_beat)
+    ax3 = plt.subplot(gs[2], sharex=ax1)
+    _plot_drum_grid(humanized_messages, categories, ax3, "Humanized MIDI Notes", ticks_per_beat)
+
+    # Plot humanized velocities
+    ax4 = plt.subplot(gs[3], sharex=ax1)
+    _plot_velocities(humanized_messages, categories, ax4, "Humanized MIDI Velocities", ticks_per_beat)
 
     # Plot velocity differences
-    ax3 = plt.subplot(gs[2], sharex=ax1)
-    _plot_velocity_differences(original_messages, humanized_messages, ax3, ticks_per_beat)
+    ax5 = plt.subplot(gs[4], sharex=ax1)
+    _plot_velocity_differences(original_messages, humanized_messages, ax5, ticks_per_beat)
 
-    fig.subplots_adjust(hspace=0.4, top=0.95, bottom=0.08, left=0.1, right=0.88)
+    fig.subplots_adjust(hspace=0.1, top=0.98, bottom=0.08, left=0.1, right=0.88)
 
     # Disable vertical zooming and panning by locking the y-limits
-    for ax in [ax1, ax2, ax3]:
+    for ax in [ax1, ax2, ax3, ax4, ax5]:
         original_ylim = ax.get_ylim()
         def lock_ylim(axes, yl=original_ylim):
             if axes.get_ylim() != yl:
@@ -445,7 +453,7 @@ def create_drum_visualization(
 
 
 def _plot_drum_grid(
-    messages: List[Tuple[int, int, int]], categories: dict, ax: plt.Axes, title: str, ticks_per_beat: int = 480
+    messages: List[Tuple[int, int, int]], categories: dict, ax: plt.Axes, title: str, ticks_per_beat: int = 480, show_legend: bool = False
 ) -> None:
     """Plot a grid of drum hits colored by category and sized by velocity.
 
@@ -468,21 +476,56 @@ def _plot_drum_grid(
             ax.scatter(
                 times, [i] * len(times), s=20, c=[colors[i]], marker="d", alpha=0.9, label=cat
             )
-            # Draw a trailing up-stalk indicating the velocity natively
-            normalized_vels = [i + (v / 127.0) * 0.4 for v in vels]
-            ax.vlines(
-                times, [i] * len(times), normalized_vels, color=colors[i], alpha=0.5, linewidth=1.5
-            )
 
-    ax.set_title(title, pad=10)
+    ax.annotate(
+        title, xy=(0.5, 0.95), xycoords='axes fraction', 
+        ha='center', va='top', fontsize=10, fontweight='bold', color='white', 
+        bbox=dict(boxstyle='round,pad=0.2', facecolor='#111111', edgecolor='none', alpha=0.8)
+    )
     ax.set_yticks(range(len(categories)))
     ax.set_yticklabels(list(categories.keys()))
     _add_timing_grid(ax, ticks_per_beat)
-    ax.legend(bbox_to_anchor=(1.01, 1), loc="upper left")
+    if show_legend:
+        ax.legend(bbox_to_anchor=(1.01, 1), loc="upper left")
+
+def _plot_velocities(
+    messages: List[Tuple[int, int, int]], categories: dict, ax: plt.Axes, title: str, ticks_per_beat: int = 480, show_legend: bool = False
+) -> None:
+    """Plot the velocity of drum hits.
+
+    Args:
+        messages: List of (time, note, velocity) tuples.
+        categories: Dictionary mapping category names to lists of note numbers.
+        ax: The matplotlib Axes object.
+        title: Title for the plot.
+    """
+    colors = plt.cm.tab10(np.linspace(0, 1, len(categories)))
+
+    for i, (cat, notes) in enumerate(categories.items()):
+        times, vels = [], []
+        for t, n, v in messages:
+            if n in notes:
+                times.append(t)
+                vels.append(v)
+        if times:
+            ax.vlines(
+                times, 0, vels, color=colors[i], alpha=0.7, linewidth=1.5, label=cat
+            )
+
+    ax.annotate(
+        title, xy=(0.5, 0.95), xycoords='axes fraction', 
+        ha='center', va='top', fontsize=10, fontweight='bold', color='white', 
+        bbox=dict(boxstyle='round,pad=0.2', facecolor='#111111', edgecolor='none', alpha=0.8)
+    )
+    ax.set_ylim(0, 130)
+    ax.set_ylabel("Velocity")
+    _add_timing_grid(ax, ticks_per_beat)
+    if show_legend:
+        ax.legend(bbox_to_anchor=(1.01, 1), loc="upper left")
 
 
 def _plot_velocity_differences(
-    original: List[Tuple[int, int, int]], humanized: List[Tuple[int, int, int]], ax: plt.Axes, ticks_per_beat: int = 480
+    original: List[Tuple[int, int, int]], humanized: List[Tuple[int, int, int]], ax: plt.Axes, ticks_per_beat: int = 480, show_legend: bool = False
 ) -> None:
     """Plot the velocity differences between original and humanized notes.
 
@@ -506,7 +549,11 @@ def _plot_velocity_differences(
         colors = ["#44FF44" if d > 0 else "#FF4444" for d in diffs]
         ax.vlines(times, 0, diffs, color=colors, alpha=0.7, linewidth=1.5)
         ax.axhline(y=0, color="w", linestyle="-", alpha=0.3)
-        ax.set_title("Velocity Differences", pad=10)
+        ax.annotate(
+            "Velocity Differences", xy=(0.5, 0.95), xycoords='axes fraction', 
+            ha='center', va='top', fontsize=10, fontweight='bold', color='white', 
+            bbox=dict(boxstyle='round,pad=0.2', facecolor='#111111', edgecolor='none', alpha=0.8)
+        )
         ax.set_ylabel("Δ Velocity")
         _add_timing_grid(ax, ticks_per_beat)
 
