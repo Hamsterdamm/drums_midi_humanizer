@@ -138,6 +138,7 @@ def test_humanize_track_integration(humanizer):
     track.append(mido.Message("note_off", note=36, velocity=0, time=480))
 
     humanizer.ticks_per_beat = 480
+    humanizer.config.ghost_note_prob = 0.0  # Disable ghost notes to avoid unpredictable note counts
 
     new_track, orig_msgs, human_msgs = humanizer._humanize_track(track)
 

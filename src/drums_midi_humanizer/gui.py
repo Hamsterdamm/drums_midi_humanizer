@@ -171,7 +171,7 @@ class HumanizerApp:
             orig_msgs, human_msgs = humanizer.process_file(input_path, output_path)
             
             if orig_msgs and human_msgs:
-                self._load_and_display_interactive_plot(orig_msgs, human_msgs)
+                self._load_and_display_interactive_plot(orig_msgs, human_msgs, humanizer.ticks_per_beat)
                 self.status_var.set(f"Done! Saved: {Path(output_path).name}")
             else:
                 self.status_var.set(f"Done! But visualization failed (no notes).")
@@ -181,7 +181,7 @@ class HumanizerApp:
             messagebox.showerror("Error", f"An error occurred:\n{str(e)}")
             self.status_var.set("Error occurred.")
 
-    def _load_and_display_interactive_plot(self, orig_msgs, human_msgs):
+    def _load_and_display_interactive_plot(self, orig_msgs, human_msgs, ticks_per_beat=480):
         if self.canvas_widget:
             self.canvas_widget.get_tk_widget().destroy()
             self.canvas_widget = None
@@ -189,7 +189,7 @@ class HumanizerApp:
             self.toolbar.destroy()
             self.toolbar = None
             
-        fig = build_drum_figure(orig_msgs, human_msgs)
+        fig = build_drum_figure(orig_msgs, human_msgs, ticks_per_beat)
         
         # Create canvas
         self.canvas_widget = FigureCanvasTkAgg(fig, master=self.img_frame)

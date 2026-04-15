@@ -9,6 +9,7 @@ for simpler tuple-based data structures.
 from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator
 import mido
 import numpy as np
 
@@ -372,13 +373,15 @@ class DrumVisualizer:
 
 def build_drum_figure(
     original_messages: List[Tuple[int, int, int]],
-    humanized_messages: List[Tuple[int, int, int]]
+    humanized_messages: List[Tuple[int, int, int]],
+    ticks_per_beat: int = 480
 ) -> plt.Figure:
     """Builds and returns the Matplotlib figure comparing original and humanized MIDI drum patterns.
     
     Args:
         original_messages: List of (time, note, velocity) tuples from original MIDI.
         humanized_messages: List of (time, note, velocity) tuples from humanized MIDI.
+        ticks_per_beat: MIDI ticks per quarter note.
         
     Returns:
         plt.Figure: The constructed Matplotlib figure object.
@@ -399,15 +402,15 @@ def build_drum_figure(
 
     # Plot original notes
     ax1 = plt.subplot(gs[0])
-    _plot_drum_grid(original_messages, categories, ax1, "Original MIDI")
+    _plot_drum_grid(original_messages, categories, ax1, "Original MIDI", ticks_per_beat)
 
     # Plot humanized notes
     ax2 = plt.subplot(gs[1], sharex=ax1)
-    _plot_drum_grid(humanized_messages, categories, ax2, "Humanized MIDI")
+    _plot_drum_grid(humanized_messages, categories, ax2, "Humanized MIDI", ticks_per_beat)
 
     # Plot velocity differences
     ax3 = plt.subplot(gs[2], sharex=ax1)
-    _plot_velocity_differences(original_messages, humanized_messages, ax3)
+    _plot_velocity_differences(original_messages, humanized_messages, ax3, ticks_per_beat)
 
     fig.subplots_adjust(hspace=0.4, top=0.95, bottom=0.08, left=0.1, right=0.88)
     return fig
@@ -433,7 +436,7 @@ def create_drum_visualization(
 
 
 def _plot_drum_grid(
-    messages: List[Tuple[int, int, int]], categories: dict, ax: plt.Axes, title: str
+    messages: List[Tuple[int, int, int]], categories: dict, ax: plt.Axes, title: str, ticks_per_beat: int = 480
 ) -> None:
     """Plot a grid of drum hits colored by category and sized by velocity.
 
@@ -465,12 +468,12 @@ def _plot_drum_grid(
     ax.set_title(title, pad=10)
     ax.set_yticks(range(len(categories)))
     ax.set_yticklabels(list(categories.keys()))
-    ax.grid(True, alpha=0.15)
+    _add_timing_grid(ax, ticks_per_beat)
     ax.legend(bbox_to_anchor=(1.01, 1), loc="upper left")
 
 
 def _plot_velocity_differences(
-    original: List[Tuple[int, int, int]], humanized: List[Tuple[int, int, int]], ax: plt.Axes
+    original: List[Tuple[int, int, int]], humanized: List[Tuple[int, int, int]], ax: plt.Axes, ticks_per_beat: int = 480
 ) -> None:
     """Plot the velocity differences between original and humanized notes.
 
@@ -496,4 +499,15 @@ def _plot_velocity_differences(
         ax.axhline(y=0, color="w", linestyle="-", alpha=0.3)
         ax.set_title("Velocity Differences", pad=10)
         ax.set_ylabel("Δ Velocity")
-        ax.grid(True, alpha=0.15)
+        _add_timing_grid(ax, ticks_per_beat)
+
+def _add_timing_grid(ax: plt.Axes, ticks_per_beat: int, beats_per_bar: int = 4) -> None:
+    minor_locator = MultipleLocator(ticks_per_beat)
+    major_locator = MultipleLocator(ticks_per_beat * beats_per_bar)
+    
+    ax.xaxis.set_minor_locator(minor_locator)
+    ax.xaxis.set_major_locator(major_locator)
+    
+    ax.grid(True, which='major', axis='x', color='w', alpha=0.3, linewidth=1.5)
+    ax.grid(True, which='minor', axis='x', color='w', alpha=0.1, linewidth=0.5)
+    ax.grid(True, which='major', axis='y', alpha=0.15)
