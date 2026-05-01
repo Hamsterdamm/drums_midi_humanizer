@@ -198,7 +198,8 @@ class DrumHumanizer:
                     time = int(i * sixteenth_ticks)
                     # Add some timing variation
                     time += random.randint(-self.config.timing_variation, self.config.timing_variation)
-                    if time < 0: time = 0
+                    if time < 0:
+                        time = 0
                     velocity = random.randint(15, 40)
                     ghosts.append((time, snare_note, velocity))
                     
@@ -339,7 +340,7 @@ class DrumHumanizer:
             notes_processed_count += 1
             original_messages.append((time, msg.note, msg.velocity))
 
-            measure_pos, measure_duration, measure_idx, numerator = self.timeline.get_measure_info(time)
+            measure_pos, _, measure_idx, numerator = self.timeline.get_measure_info(time)
             tempo_multiplier = self.timeline.get_tempo_multiplier(time)
             in_fill = any(start <= time <= end for start, end in self.merged_fills)
 

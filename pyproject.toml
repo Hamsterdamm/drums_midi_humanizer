@@ -30,45 +30,11 @@ dependencies = [
     "Pillow>=9.0.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "black>=22.0.0",
-    "pylint>=2.15.0",
-    "mypy>=0.990",
-]
 
 [project.scripts]
 humanize-drums = "drums_midi_humanizer.cli:main"
 humanize-drums-gui = "drums_midi_humanizer.gui:main"
 
-[tool.black]
-line-length = 100
-target-version = ['py310']
-include = '\.pyi?$'
-
-[tool.isort]
-profile = "black"
-line_length = 100
-multi_line_output = 3
-
-[tool.pylint.master]
-ignore-paths = ["tests"]
-
-[tool.pylint.messages_control]
-disable = [
-    "C0114",  # missing-module-docstring
-    "C0115",  # missing-class-docstring
-    "C0116",  # missing-function-docstring
-    "R0902",  # too-many-instance-attributes
-    "R0903",  # too-few-public-methods
-    "R0913",  # too-many-arguments
-    "R0914",  # too-many-locals
-    "W0511",  # fixme
-]
-
-[tool.pylint.format]
-max-line-length = 100
 
 [tool.mypy]
 python_version = "3.10"
@@ -80,3 +46,10 @@ check_untyped_defs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.1.0",
+    "pytest>=7.0.0",
+    "mypy>=0.990",
+]

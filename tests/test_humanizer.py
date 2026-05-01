@@ -1,7 +1,5 @@
 """Tests for the MIDI drum humanizer."""
 
-from pathlib import Path
-from unittest.mock import patch
 
 import mido
 import pytest
@@ -178,7 +176,7 @@ def test_rudiment_integration(humanizer):
     humanizer.profile.velocity_emphasis = 0
     
     # Run humanize track
-    new_track, orig_msgs, human_msgs = humanizer._humanize_track(track)
+    _, _, human_msgs = humanizer._humanize_track(track)
     
     # With velocity_variation = 0, new_velocity before rudiment is exactly original (100)
     # For flam tap (4 notes), velocity_ratios are usually [1.0, 0.8, 1.0, 0.8]
@@ -192,7 +190,7 @@ def test_rudiment_integration(humanizer):
     # With accent probability there could be some variation, let's force accent_prob to 0
     humanizer.config.accent_prob = 0.0
     # Re-run after zeroing accent probability to ensure perfectly predictable outcome
-    new_track, orig_msgs, human_msgs = humanizer._humanize_track(track)
+    _, _, human_msgs = humanizer._humanize_track(track)
     velocities = [msg[2] for msg in human_msgs]
     
     # Note: If no other ghost note or accent variations were applied, we should see 90 
@@ -220,7 +218,7 @@ def test_crash_kick_alignment(humanizer):
     # Ensure significant timing variation to verify they don't randomly diverge
     humanizer.config.timing_variation = 50
 
-    new_track, orig_msgs, human_msgs = humanizer._humanize_track(track)
+    _, _, human_msgs = humanizer._humanize_track(track)
 
     # Find the humanized times for the Kick and the Crash
     kick_times = [msg[0] for msg in human_msgs if msg[1] == 36]

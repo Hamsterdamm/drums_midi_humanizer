@@ -255,8 +255,8 @@ class DrumVisualizer:
         labels = []
 
         for ax in plot_axes:
-            h, l = ax.get_legend_handles_labels()
-            for hi, li in zip(h, l):
+            h, lbls = ax.get_legend_handles_labels()
+            for hi, li in zip(h, lbls):
                 if li not in labels:
                     handles.append(hi)
                     labels.append(li)
@@ -525,7 +525,7 @@ def _plot_velocities(
 
 
 def _plot_velocity_differences(
-    original: List[Tuple[int, int, int]], humanized: List[Tuple[int, int, int]], ax: plt.Axes, ticks_per_beat: int = 480, show_legend: bool = False
+    original: List[Tuple[int, int, int]], humanized: List[Tuple[int, int, int]], ax: plt.Axes, ticks_per_beat: int = 480
 ) -> None:
     """Plot the velocity differences between original and humanized notes.
 

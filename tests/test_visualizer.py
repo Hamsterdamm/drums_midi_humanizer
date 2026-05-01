@@ -44,7 +44,7 @@ def test_get_note_names(visualizer):
 
 @patch("matplotlib.pyplot.subplot")
 @patch("matplotlib.pyplot.figure")
-def test_create_comparison_plot(mock_figure, mock_subplot, visualizer, tmp_path):
+def test_create_comparison_plot(_mock_figure, mock_subplot, visualizer, tmp_path):
     """Test plot creation flow (mocking matplotlib)."""
     orig_msgs = [(0, mido.Message("note_on", note=36, velocity=100))]
     human_msgs = [(0, mido.Message("note_on", note=36, velocity=105))]

@@ -3,7 +3,6 @@ import pytest
 from drums_midi_humanizer.config.drums import (
     DRUMMER_PROFILES,
     DrumMap,
-    DrummerProfile,
     get_drum_map,
 )
 

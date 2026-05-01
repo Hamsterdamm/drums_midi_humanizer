@@ -1,6 +1,5 @@
 import os
 import pytest
-import mido
 from mido import Message, MidiFile, MidiTrack, MetaMessage
 from drums_midi_humanizer.core.humanizer import DrumHumanizer, HumanizerConfig
 from drums_midi_humanizer.config.drums import DRUMMER_PROFILES

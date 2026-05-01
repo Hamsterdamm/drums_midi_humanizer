@@ -174,7 +174,7 @@ class HumanizerApp:
                 self._load_and_display_interactive_plot(orig_msgs, human_msgs, humanizer.ticks_per_beat)
                 self.status_var.set(f"Done! Saved: {Path(output_path).name}")
             else:
-                self.status_var.set(f"Done! But visualization failed (no notes).")
+                self.status_var.set("Done! But visualization failed (no notes).")
                 
         except Exception as e:
             logger.exception("Error during humanization")
@@ -205,7 +205,7 @@ class HumanizerApp:
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     root = tk.Tk()
-    app = HumanizerApp(root)
+    HumanizerApp(root)
     root.mainloop()
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ The **MIDI Drum Humanizer** is a Python utility that transforms robotic, quantiz
 ## Architecture
 
 ### Entry Point
-- **`humanize-drums.py`**: The main execution script. It wraps `src/drums_midi_humanizer/cli.py`.
+- **`drums_midi_humanizer/cli.py`**: The main execution script, accessed via the `humanize-drums` command.
 
 ### Source Code (`src/drums_midi_humanizer/`)
 - **`cli.py`**: Handles argument parsing and initiates the `DrumHumanizer`.
@@ -23,8 +23,7 @@ The **MIDI Drum Humanizer** is a Python utility that transforms robotic, quantiz
 - **`visualization/`**: Logic for generating comparison graphs (matplotlib).
 
 ### Utilities
-- **`midi-tempo-analysis.py`**: A standalone script for detecting tempo and time signatures in MIDI files lacking explicit metadata.
-- **`midi_visualizer.py`**: Contains the plotting logic used for generating comparison images.
+- **`visualization/visualizer.py`**: Contains the plotting logic used for generating comparison images.
 
 ## Key Classes & Data Structures
 
