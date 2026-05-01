@@ -10,6 +10,7 @@ This script takes a quantized, robotic-sounding MIDI drum track and applies subt
 - **Velocity Variation**: Adjusts the velocity of each note to add dynamics and expression.
 - **Drummer Profiles**: Emulates different drumming styles (e.g., "balanced", "tight", "loose") with unique rhythmic characteristics.
 - **Advanced Rhythmic Nuances**:
+  - **Dynamic Tempos & Odd Meters**: Gracefully processes complex MIDI structures with tempo automations and varying time signatures (e.g., 3/4, 6/8) without losing the musical groove.
   - **Ghost Notes**: Automatically adds low-velocity ghost notes, especially on the snare.
   - **Accents**: Adds emphasis to certain notes.
   - **Flams**: Creates realistic flam strokes on the snare.
@@ -120,6 +121,7 @@ The application treats a drum kit not as a collection of isolated MIDI triggers,
 * **Limb Interdependence:** When a drummer strikes multiple drums simultaneously (e.g., a kick and a hi-hat), their body naturally locks the limbs together. The code mimics this by reducing hi-hat timing variation when a kick or snare occurs at the same time.
 * **Rebound Physics (Rudiments):** The application recognizes that human hands rely on physics. In a double stroke (RR or LL), the second note is a bounce and naturally has lower velocity than the initial downward stroke. This is accurately mapped in the `velocity_ratio` of the `DRUM_RUDIMENTS` dictionary.
 * **Dynamic Anchoring:** The kick drum serves as the band's metronome. The application explicitly enforces tighter timing on downbeats for the kick drum.
+* **Tempo-Agnostic Drift:** The mathematical application of "timing drift" scales dynamically with the current BPM. A given human deviation remains physically consistent in real-world milliseconds whether the drummer is playing at 60 BPM or 200 BPM, preventing slow tempos from feeling rigid or fast tempos from falling apart.
 
 ### What is Highly Accurate (Musically Correct)
 

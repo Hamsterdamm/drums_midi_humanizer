@@ -4,7 +4,7 @@
 **Maturity Level:** Beta / In-Refactor
 **Code Quality:** High (Style/Structure), Mixed (Integration/Logic/Robustness)
 
-The project demonstrates a solid architectural foundation with separation of concerns (CLI, Core, Config, Viz). Several critical issues have been recently resolved including logging, exception handling, and note duration preservation. However, the integration of advanced humanization logic (rudiments) remains incomplete, and the application still relies on certain hardcoded assumptions regarding MIDI metadata (tempo/time signature).
+The project demonstrates a solid architectural foundation with separation of concerns (CLI, Core, Config, Viz). Several critical issues have been recently resolved including logging, exception handling, note duration preservation, and rudiment pattern integration. Furthermore, the core processing engine now dynamically handles shifting tempos and varying time signatures, ensuring realistic humanization across complex song structures.
 
 ## Critical Issues (Bugs & Logic Gaps)
 
@@ -12,8 +12,8 @@ The project demonstrates a solid architectural foundation with separation of con
 - ~~**Rudiment Detection Unused (High)**: `detect_rudiment_pattern` is defined in `utils/midi.py` but never utilized directly in the main `process_file` loops.~~ **(Resolved)**
 
 ### 2. MIDI & Music Theory Limitations
-- **Time Signature Assumptions (Medium)**: Hardcoded `self.time_sig_numerator = 4`. `time_signature` meta-messages exist but are not tracked to dynamically alter logic for 3/4, 6/8, etc.
-- **Tempo Changes Ignored (Medium)**: The script does not dynamically assess its timings based on shifting tempos through the track.
+- ~~**Time Signature Assumptions (Medium)**: Hardcoded `self.time_sig_numerator = 4`. `time_signature` meta-messages exist but are not tracked to dynamically alter logic for 3/4, 6/8, etc.~~ **(Resolved)**
+- ~~**Tempo Changes Ignored (Medium)**: The script does not dynamically assess its timings based on shifting tempos through the track.~~ **(Resolved)**
 
 ## Areas for Fine-Tuning
 
@@ -49,7 +49,7 @@ The project demonstrates a solid architectural foundation with separation of con
 - [x] **Integrate Rudiments**: Call `detect_rudiment_pattern` within `process_file` to affect humanizer outcomes.
 
 ### Phase 2: MIDI Fidelity
-- [ ] **Dynamic Time Signatures**: Parse `time_signature` events and update `time_sig_numerator` dynamically.
+- [x] **Dynamic Time Signatures & Tempo**: Parse `time_signature` and `set_tempo` events and dynamically calculate measure positions via `MidiTimeline`.
 - [x] **Preserve Metadata**: Channel logic is mapped correctly and non-note-events are successfully passed into the output.
 - [x] **Note Durations**: `note_off` and `note_on` messages are successfully paired, maintaining original note durations on rewrite.
 
