@@ -95,6 +95,8 @@ class DrumHumanizer:
             self.CYMBAL_NOTES,
             self.RIDE_NOTES,
         ) = self.drum_map.get_note_groups()
+        self.OPEN_HIHAT_NOTES = self.drum_map.open_hihat_notes
+        self.CLOSED_HIHAT_NOTES = self.drum_map.closed_hihat_notes
         self.ticks_per_beat = 0
         self.tempo_drift = 0
         self.merged_fills: List[Tuple[int, int]] = []
@@ -224,11 +226,16 @@ class DrumHumanizer:
         # We need random access to notes occurring at specific times to make context-aware decisions
         # (e.g., adjusting hi-hat timing if a snare is played at the same time).
         notes_by_time: Dict[int, List[mido.Message]] = {}
+        closed_hihat_times_set = set()
         for time, msg in events_with_absolute_time:
             if msg.type == "note_on" and msg.velocity > 0:
                 if time not in notes_by_time:
                     notes_by_time[time] = []
                 notes_by_time[time].append(msg)
+                if msg.note in self.CLOSED_HIHAT_NOTES:
+                    closed_hihat_times_set.add(time)
+                    
+        closed_hihat_times = sorted(list(closed_hihat_times_set))
 
         # Detect fills
         # Fills usually happen on faster subdivisions (16th notes or faster), so we use that as a heuristic.
@@ -353,14 +360,14 @@ class DrumHumanizer:
                 timing_offset = kick_offsets[time]
             else:
                 timing_offset = self.humanize_timings(
-                    msg, time, notes_by_time, in_fill, is_pattern_point, pattern_key, measure_pos, tempo_multiplier, numerator
+                    msg, time, notes_by_time, in_fill, is_pattern_point, pattern_key, measure_pos, tempo_multiplier, numerator, closed_hihat_times
                 )
                 if msg.note in self.KICK_NOTES:
                     kick_offsets[time] = timing_offset
 
             new_time = max(0, time + int(timing_offset))
             new_velocity = self.humanize_velocity(
-                msg, time, in_fill, measure_pos, measure_idx, numerator
+                msg, time, in_fill, measure_pos, measure_idx, numerator, closed_hihat_times
             )
 
             if is_pattern_point:
@@ -417,6 +424,7 @@ class DrumHumanizer:
         measure_position: float,
         tempo_multiplier: float,
         numerator: int,
+        closed_hihat_times: List[int] = None,
     ) -> float:
         """Calculate complex timing variations for a note (Advanced Logic).
 
@@ -430,6 +438,7 @@ class DrumHumanizer:
             measure_position (float): Position within the measure.
             tempo_multiplier (float): Scaling factor based on tempo.
             numerator (int): Current time signature numerator.
+            closed_hihat_times (List[int]): Sorted list of times where a closed hi-hat occurs.
 
         Returns:
             float: The calculated timing offset in ticks.
@@ -442,7 +451,7 @@ class DrumHumanizer:
         elif msg.note in self.SNARE_NOTES:
             note_type_timing_var = self._handle_snare_timing(measure_position, numerator)
         elif msg.note in self.HIHAT_NOTES:
-            note_type_timing_var = self._handle_hihat_timing(notes_by_time, time, measure_position)
+            note_type_timing_var = self._handle_hihat_timing(notes_by_time, time, measure_position, msg, closed_hihat_times)
         elif msg.note in self.CYMBAL_NOTES:
             note_type_timing_var = self._handle_cymbal_timing(measure_position)
         elif msg.note in self.RIDE_NOTES:
@@ -475,6 +484,7 @@ class DrumHumanizer:
         measure_position: float,
         measure_idx: int,
         numerator: int,
+        closed_hihat_times: List[int] = None,
     ) -> int:
         """Calculate complex velocity variations for a note (Advanced Logic).
 
@@ -485,6 +495,7 @@ class DrumHumanizer:
             measure_position (float): Position within the measure.
             measure_idx (int): Index of the current measure.
             numerator (int): Current time signature numerator.
+            closed_hihat_times (List[int]): Sorted list of times where a closed hi-hat occurs.
 
         Returns:
             int: The new velocity value (clamped between 1 and 127).
@@ -497,7 +508,7 @@ class DrumHumanizer:
         elif msg.note in self.SNARE_NOTES:
             velocity_var = self._handle_snare_velocity(measure_position, numerator)
         elif msg.note in self.HIHAT_NOTES:
-            velocity_var = self._handle_hihat_velocity(measure_position)
+            velocity_var = self._handle_hihat_velocity(measure_position, time, msg, closed_hihat_times)
         elif msg.note in self.CYMBAL_NOTES:
             velocity_var = self._handle_cymbal_velocity(measure_position, measure_idx)
         elif msg.note in self.RIDE_NOTES:
@@ -538,11 +549,21 @@ class DrumHumanizer:
         return random.uniform(-self.config.timing_variation, self.config.timing_variation)
 
     def _handle_hihat_timing(
-        self, notes_by_time: Dict, time: int, measure_position: float
+        self, notes_by_time: Dict, time: int, measure_position: float, msg: mido.Message = None, closed_hihat_times: List[int] = None
     ) -> float:
         """Calculate timing variation specifically for hi-hats."""
+        import bisect
         hihat_var = self.config.timing_variation * self.profile.hihat_variation
         var = random.uniform(-hihat_var, hihat_var)
+
+        # Open/Closed Hi-Hat Interactions: preceding a choke
+        if msg is not None and closed_hihat_times and msg.note in self.OPEN_HIHAT_NOTES:
+            idx = bisect.bisect_right(closed_hihat_times, time)
+            if idx < len(closed_hihat_times):
+                next_closed_time = closed_hihat_times[idx]
+                if next_closed_time - time <= self.ticks_per_beat / 2:
+                    # Choke preparation: drummer subtly anticipates the closing
+                    var -= random.uniform(1, 4) * self.profile.hihat_variation
 
         # Add shuffle feel if configured
         if self.config.shuffle_amount > 0 and self._is_offbeat_eighth(measure_position):
@@ -610,14 +631,27 @@ class DrumHumanizer:
             return var
         return int(random.randint(-10, 0) * self.profile.velocity_emphasis)
 
-    def _handle_hihat_velocity(self, measure_position: float) -> int:
+    def _handle_hihat_velocity(self, measure_position: float, time: int = 0, msg: mido.Message = None, closed_hihat_times: List[int] = None) -> int:
         """Calculate velocity adjustment for hi-hats."""
+        import bisect
         sixteenth_pos = round(measure_position * 16) / 16
         if sixteenth_pos.is_integer():
-            return int(random.randint(0, 15) * self.profile.velocity_emphasis)
+            base_vel = int(random.randint(0, 15) * self.profile.velocity_emphasis)
         elif sixteenth_pos * 2 == round(sixteenth_pos * 2):
-            return int(random.randint(0, 5) * self.profile.velocity_emphasis)
-        return int(random.randint(-15, 0) * self.profile.velocity_emphasis)
+            base_vel = int(random.randint(0, 5) * self.profile.velocity_emphasis)
+        else:
+            base_vel = int(random.randint(-15, 0) * self.profile.velocity_emphasis)
+            
+        # Open/Closed Hi-Hat Interactions: preceding a choke
+        if msg is not None and closed_hihat_times and msg.note in self.OPEN_HIHAT_NOTES:
+            idx = bisect.bisect_right(closed_hihat_times, time)
+            if idx < len(closed_hihat_times):
+                next_closed_time = closed_hihat_times[idx]
+                if next_closed_time - time <= self.ticks_per_beat / 2:
+                    # Reduce velocity significantly because drummer is preparing to choke
+                    base_vel -= int(random.randint(10, 20) * self.profile.velocity_emphasis)
+                    
+        return base_vel
 
     def _handle_ride_velocity(self, measure_position: float) -> int:
         """Calculate velocity adjustment for ride cymbals."""

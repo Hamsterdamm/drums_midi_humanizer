@@ -7,7 +7,7 @@ drum humanizer. It includes:
 - Rudiment definitions for pattern detection.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Set, Tuple
 
 
@@ -61,6 +61,8 @@ class DrumMap:
     tom_notes: set[int]
     cymbal_notes: set[int]
     ride_notes: set[int]
+    open_hihat_notes: set[int] = field(default_factory=set)
+    closed_hihat_notes: set[int] = field(default_factory=set)
 
     def get_note_groups(self) -> Tuple[Set[int], Set[int], Set[int], Set[int], Set[int], Set[int]]:
         """Get all note groups as a tuple of sets.
@@ -89,6 +91,8 @@ DRUM_MAPS = {
         tom_notes={41, 43, 45, 47, 48, 50},  # Low/Mid/High Floor/Tom
         cymbal_notes={49, 52, 55, 57},  # Crash cymbals, splash, china
         ride_notes={51, 53, 59},  # Ride cymbals
+        open_hihat_notes={46},
+        closed_hihat_notes={42, 44},
     ),
     "ad2": DrumMap(  # Addictive Drums 2
         kick_notes={36},
@@ -97,6 +101,8 @@ DRUM_MAPS = {
         tom_notes={65, 66, 67, 68, 69, 70, 71, 72},  # Toms 1-4 and rimshots
         cymbal_notes={46, 77, 78, 79, 80, 81, 82, 89, 90, 91, 92, 93, 94},  # Crashes and chokes
         ride_notes={45, 60, 61, 62, 63, 84, 85, 86, 87},  # Rides 1 & 2
+        open_hihat_notes={52, 53, 54, 55, 56, 57, 58, 59},
+        closed_hihat_notes={48, 49, 50, 51},
     ),
     "sd3": DrumMap(  # Superior Drummer 3
         kick_notes={35, 36},
@@ -105,6 +111,8 @@ DRUM_MAPS = {
         tom_notes={41, 43, 45, 47, 48, 50},
         cymbal_notes={49, 52, 55, 56, 57, 58},  # Crash cymbals
         ride_notes={51, 53, 59},  # Ride cymbals
+        open_hihat_notes={46, 54, 56},
+        closed_hihat_notes={42, 44},
     ),
     "ez2": DrumMap(  # EZdrummer 2
         kick_notes={35, 36},
@@ -113,6 +121,8 @@ DRUM_MAPS = {
         tom_notes={41, 43, 45, 47, 48, 50},
         cymbal_notes={49, 52, 55, 57},
         ride_notes={51, 53, 59},
+        open_hihat_notes={46, 54},
+        closed_hihat_notes={42, 44},
     ),
     "ssd5": DrumMap(  # Steven Slate Drums 5
         kick_notes={35, 36},
@@ -121,6 +131,8 @@ DRUM_MAPS = {
         tom_notes={41, 43, 45, 47, 48, 50},
         cymbal_notes={49, 52, 55, 56, 57, 58},
         ride_notes={51, 53, 59},
+        open_hihat_notes={46, 54, 56},
+        closed_hihat_notes={42, 44},
     ),
     "mtpk2": DrumMap(  # MT Power Kit 2
         kick_notes={36},
@@ -129,6 +141,8 @@ DRUM_MAPS = {
         tom_notes={41, 43, 45, 47},
         cymbal_notes={49, 52, 55},
         ride_notes={51, 53},
+        open_hihat_notes={46},
+        closed_hihat_notes={42, 44},
     ),
 }
 
