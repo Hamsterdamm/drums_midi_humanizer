@@ -374,7 +374,8 @@ class DrumVisualizer:
 def build_drum_figure(
     original_messages: List[Tuple[int, int, int]],
     humanized_messages: List[Tuple[int, int, int]],
-    ticks_per_beat: int = 480
+    ticks_per_beat: int = 480,
+    drum_map = None
 ) -> plt.Figure:
     """Builds and returns the Matplotlib figure comparing original and humanized MIDI drum patterns.
     
@@ -382,6 +383,7 @@ def build_drum_figure(
         original_messages: List of (time, note, velocity) tuples from original MIDI.
         humanized_messages: List of (time, note, velocity) tuples from humanized MIDI.
         ticks_per_beat: MIDI ticks per quarter note.
+        drum_map: Optional DrumMap object to use for note categorization.
         
     Returns:
         plt.Figure: The constructed Matplotlib figure object.
@@ -392,13 +394,22 @@ def build_drum_figure(
     gs = plt.GridSpec(5, 1, height_ratios=[4, 2, 4, 2, 2], hspace=0.1)
 
     # Categories for grouping drums
-    categories = {
-        "Kicks": list(range(35, 37)),
-        "Snares": list(range(37, 41)),
-        "Hi-hats": list(range(42, 47)),
-        "Toms": list(range(41, 51)),
-        "Cymbals": list(range(51, 60)),
-    }
+    if drum_map:
+        categories = {
+            "Kicks": list(drum_map.kick_notes),
+            "Snares": list(drum_map.snare_notes),
+            "Hi-hats": list(drum_map.hihat_notes),
+            "Toms": list(drum_map.tom_notes),
+            "Cymbals": list(set(drum_map.cymbal_notes) | set(getattr(drum_map, 'ride_notes', set()))),
+        }
+    else:
+        categories = {
+            "Kicks": list(range(35, 37)),
+            "Snares": list(range(37, 41)),
+            "Hi-hats": list(range(42, 47)),
+            "Toms": [41, 43, 45, 47, 48, 50],
+            "Cymbals": list(set(range(49, 60)) - {50, 54, 56}),
+        }
 
     # Plot original notes
     ax1 = plt.subplot(gs[0])
