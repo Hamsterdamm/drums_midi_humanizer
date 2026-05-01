@@ -6,12 +6,126 @@ These utilities support the core humanization logic by abstracting common
 MIDI operations.
 """
 
+import bisect
 import logging
+from dataclasses import dataclass
 from typing import Dict, List, Set, Tuple
 
 import mido
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TimeSignatureEvent:
+    time: int
+    numerator: int
+    denominator: int
+
+
+@dataclass
+class TempoEvent:
+    time: int
+    tempo: int
+
+
+@dataclass
+class TimeSignatureRegion:
+    start_time: int
+    numerator: int
+    denominator: int
+    measure_duration: int
+    start_measure_idx: int
+
+
+class MidiTimeline:
+    """Pre-parses a MIDI file to build a global timeline of tempo and time signature changes."""
+
+    def __init__(self, midi_file: mido.MidiFile):
+        self.ticks_per_beat = midi_file.ticks_per_beat
+        self.time_signatures: List[TimeSignatureEvent] = []
+        self.tempos: List[TempoEvent] = []
+        self.ts_regions: List[TimeSignatureRegion] = []
+        self._parse_timeline(midi_file)
+
+    def _parse_timeline(self, midi_file: mido.MidiFile) -> None:
+        all_meta_events = []
+        for track in midi_file.tracks:
+            abs_time = 0
+            for msg in track:
+                abs_time += msg.time
+                if msg.type == "time_signature":
+                    all_meta_events.append((abs_time, "time_signature", msg))
+                elif msg.type == "set_tempo":
+                    all_meta_events.append((abs_time, "set_tempo", msg))
+
+        all_meta_events.sort(key=lambda x: x[0])
+
+        for abs_time, msg_type, msg in all_meta_events:
+            if msg_type == "time_signature":
+                if (
+                    not self.time_signatures
+                    or self.time_signatures[-1].time != abs_time
+                    or self.time_signatures[-1].numerator != msg.numerator
+                    or self.time_signatures[-1].denominator != msg.denominator
+                ):
+                    self.time_signatures.append(
+                        TimeSignatureEvent(abs_time, msg.numerator, msg.denominator)
+                    )
+            elif msg_type == "set_tempo":
+                if not self.tempos or self.tempos[-1].time != abs_time or self.tempos[-1].tempo != msg.tempo:
+                    self.tempos.append(TempoEvent(abs_time, msg.tempo))
+
+        if not self.time_signatures:
+            self.time_signatures.append(TimeSignatureEvent(0, 4, 4))
+        if not self.tempos:
+            self.tempos.append(TempoEvent(0, 500000))
+
+        self.base_tempo = self.tempos[0].tempo
+
+        current_measure_idx = 0
+        for i, ts in enumerate(self.time_signatures):
+            measure_duration = int(self.ticks_per_beat * 4 * ts.numerator / ts.denominator)
+
+            if i > 0:
+                prev_region = self.ts_regions[-1]
+                elapsed_ticks = ts.time - prev_region.start_time
+                elapsed_measures = elapsed_ticks / prev_region.measure_duration
+                current_measure_idx += int(elapsed_measures)
+
+            self.ts_regions.append(
+                TimeSignatureRegion(
+                    start_time=ts.time,
+                    numerator=ts.numerator,
+                    denominator=ts.denominator,
+                    measure_duration=measure_duration,
+                    start_measure_idx=current_measure_idx,
+                )
+            )
+
+    def get_measure_info(self, absolute_time: int) -> Tuple[float, int, int, int]:
+        """Returns (measure_position, measure_duration_in_ticks, measure_idx, numerator)."""
+        idx = bisect.bisect_right([r.start_time for r in self.ts_regions], absolute_time) - 1
+        idx = max(0, idx)
+        region = self.ts_regions[idx]
+
+        ticks_since_region_start = absolute_time - region.start_time
+        measures_since_region_start = ticks_since_region_start / region.measure_duration
+
+        measure_idx = region.start_measure_idx + int(measures_since_region_start)
+        ticks_since_measure_start = ticks_since_region_start % region.measure_duration
+
+        ticks_per_numerator_unit = region.measure_duration / region.numerator
+        measure_position = float(ticks_since_measure_start / ticks_per_numerator_unit)
+
+        return measure_position, region.measure_duration, measure_idx, region.numerator
+
+    def get_tempo_multiplier(self, absolute_time: int) -> float:
+        """Returns a scaling float for timing variations based on tempo changes."""
+        idx = bisect.bisect_right([t.time for t in self.tempos], absolute_time) - 1
+        idx = max(0, idx)
+        current_tempo = self.tempos[idx].tempo
+        return float(self.base_tempo / current_tempo)
 
 
 def calculate_measure_position(

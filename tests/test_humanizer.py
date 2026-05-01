@@ -58,8 +58,6 @@ def test_humanizer_initialization(humanizer):
     """Test DrumHumanizer initialization."""
     assert humanizer.config.timing_variation == 10
     assert humanizer.config.velocity_variation == 15
-    assert humanizer.time_sig_numerator == 4
-    assert humanizer.time_sig_denominator == 4
 
 
 def test_invalid_config():
@@ -97,16 +95,16 @@ def test_humanize_timings(humanizer):
     humanizer.tempo_drift = 0
 
     offset = humanizer.humanize_timings(
-        msg, time, notes_by_time, in_fill, is_pattern_point, pattern_key, measure_position
+        msg, time, notes_by_time, in_fill, is_pattern_point, pattern_key, measure_position, 1.0, 4
     )
     assert offset == 0
 
     # 2. Test with variation enabled
     humanizer.config.timing_variation = 10
     offset = humanizer.humanize_timings(
-        msg, time, notes_by_time, in_fill, is_pattern_point, pattern_key, measure_position
+        msg, time, notes_by_time, in_fill, is_pattern_point, pattern_key, measure_position, 1.0, 4
     )
-    assert isinstance(offset, int)
+    assert isinstance(offset, float)
     # Check range (max_var is timing_variation * 2)
     assert -20 <= offset <= 20
 
@@ -126,7 +124,7 @@ def test_humanize_velocity(humanizer):
     humanizer.config.velocity_variation = 10
     humanizer.config.accent_prob = 0.0
 
-    new_vel = humanizer.humanize_velocity(msg, time, in_fill, measure_position, measure_idx)
+    new_vel = humanizer.humanize_velocity(msg, time, in_fill, measure_position, measure_idx, 4)
     assert 1 <= new_vel <= 127
 
 
@@ -139,6 +137,10 @@ def test_humanize_track_integration(humanizer):
 
     humanizer.ticks_per_beat = 480
     humanizer.config.ghost_note_prob = 0.0  # Disable ghost notes to avoid unpredictable note counts
+    from unittest.mock import MagicMock
+    humanizer.timeline = MagicMock()
+    humanizer.timeline.get_measure_info.return_value = (0.0, 1920, 0, 4)
+    humanizer.timeline.get_tempo_multiplier.return_value = 1.0
 
     new_track, orig_msgs, human_msgs = humanizer._humanize_track(track)
 
@@ -165,6 +167,10 @@ def test_rudiment_integration(humanizer):
 
     humanizer.ticks_per_beat = 480
     humanizer.profile.rudiment_sensitivity = 1.0  # Force rudiment detection
+    from unittest.mock import MagicMock
+    humanizer.timeline = MagicMock()
+    humanizer.timeline.get_measure_info.return_value = (0.0, 1920, 0, 4)
+    humanizer.timeline.get_tempo_multiplier.return_value = 1.0
     
     # We need a fixed variation to safely check values
     humanizer.config.velocity_variation = 0
