@@ -205,7 +205,7 @@ def detect_rudiment_pattern(
 
 def get_note_groups(
     drum_map: Dict[int, str],
-) -> Tuple[Set[int], Set[int], Set[int], Set[int], Set[int]]:
+) -> Tuple[Set[int], Set[int], Set[int], Set[int], Set[int], Set[int]]:
     """Group drum notes by instrument category based on their names.
 
     Parses the drum map names to categorize MIDI note numbers. This abstraction
@@ -216,8 +216,8 @@ def get_note_groups(
         drum_map (Dict[int, str]): Dictionary mapping MIDI note numbers to drum names.
 
     Returns:
-        Tuple[Set[int], ...]: A tuple containing five sets of note numbers:
-            (kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes).
+        Tuple[Set[int], ...]: A tuple containing six sets of note numbers:
+            (kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes, ride_notes).
     """
     # Use sets for O(1) lookups when checking note membership later.
     kick_notes = set()
@@ -225,6 +225,7 @@ def get_note_groups(
     hihat_notes = set()
     tom_notes = set()
     cymbal_notes = set()
+    ride_notes = set()
 
     for note, name in drum_map.items():
         # Normalize to lowercase to ensure robust string matching against
@@ -238,10 +239,12 @@ def get_note_groups(
             hihat_notes.add(note)
         elif "tom" in name_lower:
             tom_notes.add(note)
-        elif any(x in name_lower for x in ["crash", "ride", "china", "splash"]):
+        elif any(x in name_lower for x in ["crash", "china", "splash"]):
             cymbal_notes.add(note)
+        elif "ride" in name_lower:
+            ride_notes.add(note)
 
-    return kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes
+    return kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes, ride_notes
 
 
 def get_absolute_times(track: mido.MidiTrack) -> List[Tuple[int, mido.Message]]:

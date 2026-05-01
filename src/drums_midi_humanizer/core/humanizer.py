@@ -93,6 +93,7 @@ class DrumHumanizer:
             self.HIHAT_NOTES,
             self.TOM_NOTES,
             self.CYMBAL_NOTES,
+            self.RIDE_NOTES,
         ) = self.drum_map.get_note_groups()
         self.ticks_per_beat = 0
         self.tempo_drift = 0
@@ -434,6 +435,8 @@ class DrumHumanizer:
             note_type_timing_var = self._handle_hihat_timing(notes_by_time, time, measure_position)
         elif msg.note in self.CYMBAL_NOTES:
             note_type_timing_var = self._handle_cymbal_timing(measure_position)
+        elif msg.note in self.RIDE_NOTES:
+            note_type_timing_var = self._handle_ride_timing(notes_by_time, time, measure_position)
         elif msg.note in self.TOM_NOTES:
             note_type_timing_var = self._handle_tom_timing(in_fill)
         else:
@@ -487,6 +490,8 @@ class DrumHumanizer:
             velocity_var = self._handle_hihat_velocity(measure_position)
         elif msg.note in self.CYMBAL_NOTES:
             velocity_var = self._handle_cymbal_velocity(measure_position, measure_idx)
+        elif msg.note in self.RIDE_NOTES:
+            velocity_var = self._handle_ride_velocity(measure_position)
         elif msg.note in self.TOM_NOTES:
             velocity_var = self._handle_tom_velocity(in_fill, time)
         else:
@@ -541,6 +546,24 @@ class DrumHumanizer:
 
         return var
 
+    def _handle_ride_timing(
+        self, notes_by_time: Dict, time: int, measure_position: float
+    ) -> float:
+        """Calculate timing variation specifically for ride cymbals."""
+        # We apply the same hi-hat variation logic since the ride often acts as the primary timekeeper
+        ride_var = self.config.timing_variation * self.profile.hihat_variation
+        var = random.uniform(-ride_var, ride_var)
+
+        # Add shuffle feel if configured
+        if self.config.shuffle_amount > 0 and self._is_offbeat_eighth(measure_position):
+            var += int(self.config.shuffle_amount * self.ticks_per_beat / 2)
+
+        # Adjust timing based on kick/snare presence (tightens timing when limb interaction occurs)
+        if self._has_kick_or_snare_at_time(notes_by_time, time):
+            var *= 0.7
+
+        return var
+
     def _handle_cymbal_timing(self, measure_position: float) -> float:
         """Calculate timing variation specifically for cymbals."""
         var = random.uniform(
@@ -579,6 +602,16 @@ class DrumHumanizer:
 
     def _handle_hihat_velocity(self, measure_position: float) -> int:
         """Calculate velocity adjustment for hi-hats."""
+        sixteenth_pos = round(measure_position * 16) / 16
+        if sixteenth_pos.is_integer():
+            return int(random.randint(0, 15) * self.profile.velocity_emphasis)
+        elif sixteenth_pos * 2 == round(sixteenth_pos * 2):
+            return int(random.randint(0, 5) * self.profile.velocity_emphasis)
+        return int(random.randint(-15, 0) * self.profile.velocity_emphasis)
+
+    def _handle_ride_velocity(self, measure_position: float) -> int:
+        """Calculate velocity adjustment for ride cymbals."""
+        # Applying the same 16th-note subdivision emphasis as hi-hats
         sixteenth_pos = round(measure_position * 16) / 16
         if sixteenth_pos.is_integer():
             return int(random.randint(0, 15) * self.profile.velocity_emphasis)

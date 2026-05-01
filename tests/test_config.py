@@ -11,14 +11,14 @@ from drums_midi_humanizer.config.drums import (
 def test_drum_map_initialization():
     """Test that DrumMap initializes correctly and groups notes."""
     dm = DrumMap(
-        kick_notes={36}, snare_notes={38}, hihat_notes={42}, tom_notes={41}, cymbal_notes={49}
+        kick_notes={36}, snare_notes={38}, hihat_notes={42}, tom_notes={41}, cymbal_notes={49}, ride_notes={51}
     )
 
     assert 36 in dm.kick_notes
     assert 38 in dm.snare_notes
 
     groups = dm.get_note_groups()
-    assert len(groups) == 5
+    assert len(groups) == 6
     assert groups[0] == {36}  # Kick
     assert groups[1] == {38}  # Snare
 

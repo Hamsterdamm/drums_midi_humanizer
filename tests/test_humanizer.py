@@ -34,14 +34,15 @@ def humanizer(basic_config):
 
 def test_note_groups():
     """Test the note grouping functionality."""
-    test_map = {36: "Kick", 38: "Snare", 42: "Hi-hat Closed", 45: "Tom", 49: "Crash"}
-    kicks, snares, hihats, toms, cymbals = get_note_groups(test_map)
+    test_map = {36: "Kick", 38: "Snare", 42: "Hi-hat Closed", 45: "Tom", 49: "Crash", 51: "Ride"}
+    kicks, snares, hihats, toms, cymbals, rides = get_note_groups(test_map)
 
     assert 36 in kicks
     assert 38 in snares
     assert 42 in hihats
     assert 45 in toms
     assert 49 in cymbals
+    assert 51 in rides
 
 
 def test_merge_fills():

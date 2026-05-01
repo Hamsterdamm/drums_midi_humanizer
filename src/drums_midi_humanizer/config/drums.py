@@ -60,13 +60,14 @@ class DrumMap:
     hihat_notes: set[int]
     tom_notes: set[int]
     cymbal_notes: set[int]
+    ride_notes: set[int]
 
-    def get_note_groups(self) -> Tuple[Set[int], Set[int], Set[int], Set[int], Set[int]]:
+    def get_note_groups(self) -> Tuple[Set[int], Set[int], Set[int], Set[int], Set[int], Set[int]]:
         """Get all note groups as a tuple of sets.
 
         Returns:
             Tuple[Set[int], ...]: A tuple containing sets of note numbers for:
-                (kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes).
+                (kick_notes, snare_notes, hihat_notes, tom_notes, cymbal_notes, ride_notes).
         """
         return (
             self.kick_notes,
@@ -74,6 +75,7 @@ class DrumMap:
             self.hihat_notes,
             self.tom_notes,
             self.cymbal_notes,
+            self.ride_notes,
         )
 
 
@@ -85,42 +87,48 @@ DRUM_MAPS = {
         snare_notes={38, 40},  # Acoustic Snare, Electric Snare
         hihat_notes={42, 44, 46},  # Closed HH, Pedal HH, Open HH
         tom_notes={41, 43, 45, 47, 48, 50},  # Low/Mid/High Floor/Tom
-        cymbal_notes={49, 51, 52, 53, 55, 57, 59},  # Crash/Ride cymbals
+        cymbal_notes={49, 52, 55, 57},  # Crash cymbals, splash, china
+        ride_notes={51, 53, 59},  # Ride cymbals
     ),
     "ad2": DrumMap(  # Addictive Drums 2
         kick_notes={36},
-        snare_notes={38, 40},
-        hihat_notes={42, 44, 46, 54},  # Including extra articulations
-        tom_notes={41, 43, 45, 47, 48, 50},
-        cymbal_notes={49, 51, 52, 53, 55, 57, 59, 56},  # Including extra crashes
+        snare_notes={37, 38, 39, 40, 41, 42, 43, 44},  # Comprehensive snare articulations
+        hihat_notes={48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59},  # All HH articulations
+        tom_notes={65, 66, 67, 68, 69, 70, 71, 72},  # Toms 1-4 and rimshots
+        cymbal_notes={46, 77, 78, 79, 80, 81, 82, 89, 90, 91, 92, 93, 94},  # Crashes and chokes
+        ride_notes={45, 60, 61, 62, 63, 84, 85, 86, 87},  # Rides 1 & 2
     ),
     "sd3": DrumMap(  # Superior Drummer 3
         kick_notes={35, 36},
         snare_notes={38, 40, 37},  # Including rim shots
         hihat_notes={42, 44, 46, 54, 56},  # More hihat articulations
         tom_notes={41, 43, 45, 47, 48, 50},
-        cymbal_notes={49, 51, 52, 53, 55, 57, 59, 56, 58},  # More cymbal options
+        cymbal_notes={49, 52, 55, 56, 57, 58},  # Crash cymbals
+        ride_notes={51, 53, 59},  # Ride cymbals
     ),
     "ez2": DrumMap(  # EZdrummer 2
         kick_notes={35, 36},
         snare_notes={38, 40, 37},
         hihat_notes={42, 44, 46, 54},
         tom_notes={41, 43, 45, 47, 48, 50},
-        cymbal_notes={49, 51, 52, 53, 55, 57, 59},
+        cymbal_notes={49, 52, 55, 57},
+        ride_notes={51, 53, 59},
     ),
     "ssd5": DrumMap(  # Steven Slate Drums 5
         kick_notes={35, 36},
         snare_notes={38, 40, 37, 39},  # Including additional articulations
         hihat_notes={42, 44, 46, 54, 56},
         tom_notes={41, 43, 45, 47, 48, 50},
-        cymbal_notes={49, 51, 52, 53, 55, 57, 59, 56, 58},
+        cymbal_notes={49, 52, 55, 56, 57, 58},
+        ride_notes={51, 53, 59},
     ),
     "mtpk2": DrumMap(  # MT Power Kit 2
         kick_notes={36},
         snare_notes={38, 40},
         hihat_notes={42, 44, 46},
         tom_notes={41, 43, 45, 47},
-        cymbal_notes={49, 51, 52, 53, 55},
+        cymbal_notes={49, 52, 55},
+        ride_notes={51, 53},
     ),
 }
 
