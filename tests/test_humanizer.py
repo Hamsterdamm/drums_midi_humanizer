@@ -198,3 +198,37 @@ def test_rudiment_integration(humanizer):
     # Note: If no other ghost note or accent variations were applied, we should see 90 
     assert 90 in velocities or 91 in velocities, f"Rudiment velocity blending not applied. Velocities: {velocities}"
 
+
+def test_crash_kick_alignment(humanizer):
+    """Test that a crash and kick on the same tick share the same timing offset."""
+    track = mido.MidiTrack()
+    # Add a Kick and a Crash at the exact same time (0)
+    # Time in Mido tracks is relative.
+    track.append(mido.Message("note_on", note=36, velocity=100, time=0))  # Kick
+    track.append(mido.Message("note_on", note=49, velocity=100, time=0))  # Crash
+    track.append(mido.Message("note_off", note=36, velocity=0, time=480))
+    track.append(mido.Message("note_off", note=49, velocity=0, time=0))
+
+    humanizer.ticks_per_beat = 480
+    humanizer.config.ghost_note_prob = 0.0  # Disable ghost notes
+
+    from unittest.mock import MagicMock
+    humanizer.timeline = MagicMock()
+    humanizer.timeline.get_measure_info.return_value = (0.0, 1920, 0, 4)
+    humanizer.timeline.get_tempo_multiplier.return_value = 1.0
+
+    # Ensure significant timing variation to verify they don't randomly diverge
+    humanizer.config.timing_variation = 50
+
+    new_track, orig_msgs, human_msgs = humanizer._humanize_track(track)
+
+    # Find the humanized times for the Kick and the Crash
+    kick_times = [msg[0] for msg in human_msgs if msg[1] == 36]
+    crash_times = [msg[0] for msg in human_msgs if msg[1] == 49]
+
+    assert len(kick_times) == 1
+    assert len(crash_times) == 1
+
+    # The absolute humanized time should be exactly identical
+    assert kick_times[0] == crash_times[0], f"Crash time {crash_times[0]} did not align with Kick time {kick_times[0]}"
+

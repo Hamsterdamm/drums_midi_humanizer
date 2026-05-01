@@ -17,7 +17,7 @@ The project demonstrates a solid architectural foundation with separation of con
 
 ## Areas for Fine-Tuning
 
-- **Crash/Kick Alignment:** The application applies independent timing variations to the kick and cymbals. Cymbals on the downbeat have extreme variation logic applied to them (`var -= 2 + self.profile.rushing_factor * 3`). If the kick is clamped tightly to the downbeat but the crash cymbal drifts too far, it will create an awkward "flam" effect. A drummer hitting a crash on beat 1 almost always anchors it perfectly to the kick drum. *Tuning suggestion: If a crash and kick occur on the exact same tick, force their timing offset to be identical.*
+- ~~**Crash/Kick Alignment:** The application applies independent timing variations to the kick and cymbals. Cymbals on the downbeat have extreme variation logic applied to them (`var -= 2 + self.profile.rushing_factor * 3`). If the kick is clamped tightly to the downbeat but the crash cymbal drifts too far, it will create an awkward "flam" effect. A drummer hitting a crash on beat 1 almost always anchors it perfectly to the kick drum. *Tuning suggestion: If a crash and kick occur on the exact same tick, force their timing offset to be identical.*~~ **(Resolved)**
 - **Shuffle Logic:** The script currently creates shuffle by delaying offbeat eighth notes (`measure_position * 8`). Many grooves (like half-time shuffles or hip-hop swing) rely on delaying the *sixteenth* notes, not just the eighths. Expanding the `_is_offbeat_eighth` logic to handle 16th-note swing would broaden the application's stylistic range.
 
 ## Missing Musical Nuances
@@ -60,7 +60,7 @@ The project demonstrates a solid architectural foundation with separation of con
 - [ ] **Optimization**: Investigate generator-based processing for large files.
 
 ### Phase 4: Advanced Theory & Nuances
-- [ ] **Crash/Kick Alignment**: Bind cymbal/kick timings on downbeats.
+- [x] **Crash/Kick Alignment**: Bind cymbal/kick timings on downbeats.
 - [ ] **16th-Note Swing**: Expand shuffle logic beyond 8th notes.
 - [x] **Ride Cymbal Logic**: Separate ride from crashes and apply timekeeping logic.
 - [ ] **Hand Tracking System**: Sticking analysis to prevent physically impossible drum overlaps.

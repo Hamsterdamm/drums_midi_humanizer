@@ -278,8 +278,9 @@ class DrumHumanizer:
                     "orig_msg": orig_msg
                 })
 
-        # Sort notes by start time to process in order
-        parsed_notes.sort(key=lambda x: x["start"])
+        # Sort notes by start time to process in order.
+        # Ensure KICK notes are processed first at any given tick so cymbals can anchor to them.
+        parsed_notes.sort(key=lambda x: (x["start"], 0 if x["note"] in self.KICK_NOTES else 1))
 
         # Rudiment Detection Algorithm
         hand_notes = []
@@ -329,6 +330,8 @@ class DrumHumanizer:
         # Add non-note events to the processed list
         processed_events.extend(non_note_events)
 
+        kick_offsets: Dict[int, float] = {}
+
         for note_data in parsed_notes:
             time = note_data["start"]
             msg = note_data["orig_msg"]
@@ -344,10 +347,16 @@ class DrumHumanizer:
             is_pattern_point = rudiment_metadata is not None
             pattern_key = rudiment_metadata["pattern_key"] if is_pattern_point else None
 
-            # Apply advanced humanization logic
-            timing_offset = self.humanize_timings(
-                msg, time, notes_by_time, in_fill, is_pattern_point, pattern_key, measure_pos, tempo_multiplier, numerator
-            )
+            # Apply advanced humanization logic: Crash/Kick alignment
+            if msg.note in self.CYMBAL_NOTES and time in kick_offsets:
+                timing_offset = kick_offsets[time]
+            else:
+                timing_offset = self.humanize_timings(
+                    msg, time, notes_by_time, in_fill, is_pattern_point, pattern_key, measure_pos, tempo_multiplier, numerator
+                )
+                if msg.note in self.KICK_NOTES:
+                    kick_offsets[time] = timing_offset
+
             new_time = max(0, time + int(timing_offset))
             new_velocity = self.humanize_velocity(
                 msg, time, in_fill, measure_pos, measure_idx, numerator
